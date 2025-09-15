@@ -13,3 +13,408 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+model Category {
+  id       String     @id @default(uuid()) @db.Uuid
+  name     String
+  slug     String     @unique
+  parentId String?    @db.Uuid
+  parent   Category?  @relation("CategoryToCategory", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children Category[] @relation("CategoryToCategory")
+
+  products Product[]
+
+  @@index([parentId])
+}
+
+model Product {
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String
+  slug        String    @unique
+  description String?   @db.Text
+  status      Status
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  categoryId  String?             @db.Uuid
+  category    Category?           @relation(fields: [categoryId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  variants    ProductVariant[]
+  images      ProductImage[]
+  collections CollectionProduct[]
+
+  @@index([categoryId])
+}
+
+model ProductVariant {
+  id        String  @id @default(uuid()) @db.Uuid
+  productId String  @db.Uuid
+  product   Product @relation(fields: [productId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  sku       String  @unique
+  size      String?
+  color     String?
+  material  String?
+  isActive  Boolean @default(true)
+
+  prices     VariantPrice[]
+  inventory  VariantInventory?
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+
+  @@index([productId])
+}
+
+model VariantPrice {
+  id        String         @id @default(uuid()) @db.Uuid
+  variantId String         @db.Uuid
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  currency  String
+  amount    Decimal        @db.Decimal(10, 2)
+  compareAt Decimal?       @db.Decimal(10, 2)
+
+  @@index([variantId])
+}
+
+model VariantInventory {
+  id          String         @id @default(uuid()) @db.Uuid
+  variantId   String         @db.Uuid
+  variant     ProductVariant @relation(fields: [variantId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  stockOnHand Int
+
+  @@unique([variantId])
+}
+
+model ProductImage {
+  id        String  @id @default(uuid()) @db.Uuid
+  productId String  @db.Uuid
+  product   Product @relation(fields: [productId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  url       String
+  alt       String?
+  sort      Int
+
+  @@index([productId])
+}
+
+model Collection {
+  id   String @id @default(uuid()) @db.Uuid
+  name String
+  slug String @unique
+
+  products CollectionProduct[]
+}
+
+model CollectionProduct {
+  collectionId String     @db.Uuid
+  productId    String     @db.Uuid
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  product      Product    @relation(fields: [productId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([collectionId, productId])
+  @@index([collectionId])
+  @@index([productId])
+}
+
+model User {
+  id           String    @id @default(uuid()) @db.Uuid
+  email        String    @unique
+  provider     PROVIDER?
+  providerId   String?
+  name         String
+  passwordHash String
+
+  roles     UserRole[]
+
+  @@map("users")
+}
+
+model Role {
+  id   String @id @default(uuid()) @db.Uuid
+  name String
+
+  userRoles   UserRole[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id   String @id @default(uuid()) @db.Uuid
+  name String
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model UserRole {
+  userId String @db.Uuid()
+  roleId String @db.Uuid()
+  user   User   @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([userId, roleId])
+  @@index([userId])
+  @@index([roleId])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  roleId       String     @db.Uuid()  
+  permissionId String     @db.Uuid()
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([roleId, permissionId])
+  @@index([roleId])
+  @@index([permissionId])
+  @@map("role_permissions")
+}
+
+model Customer {
+  id           String    @id @default(uuid()) @db.Uuid
+  email        String    @unique
+  provider     PROVIDER?
+  providerId   String?
+  name         String
+  phone        String?
+  passwordHash String?
+  status       Status?
+
+  addresses Address[]
+  carts     Cart[]
+  orders    Order[]
+
+  @@map("customers")
+}
+
+model Address {
+  id         String   @id @default(uuid()) @db.Uuid
+  customerId String   @db.Uuid
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  firstName  String
+  lastName   String
+  phone      String?
+  line1      String
+  line2      String?
+  city       String
+  region     String?
+  country    String
+  postalCode String
+  isDefault  Boolean  @default(false)
+
+  billingOrders  Order[] @relation("BillingAddress")
+  shippingOrders Order[] @relation("ShippingAddress")
+
+  @@index([customerId])
+  @@map("addresses")
+}
+
+model Cart {
+  id         String   @id @default(uuid()) @db.Uuid
+  customerId String   @db.Uuid
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  items CartItem[]
+
+  @@index([customerId])
+  @@map("carts")
+}
+
+model CartItem {
+  id        String         @id @default(uuid()) @db.Uuid
+  cartId    String         @db.Uuid
+  cart      Cart           @relation(fields: [cartId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  variantId String         @db.Uuid
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  qty       Int
+
+  @@index([cartId])
+  @@index([variantId])
+  @@map("cart_items")
+}
+
+model Order {
+  id                String            @id @default(uuid()) @db.Uuid
+  orderNo           String            @unique
+  customerId        String            @db.Uuid
+  customer          Customer          @relation(fields: [customerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  currency          String
+  status            ORDERSTATUS
+  paymentStatus     PAYMENTSTATUS
+  fulfillmentStatus FULFILLMENTSTATUS
+  billingAddressId  String            @db.Uuid
+  billingAddress    Address           @relation("BillingAddress", fields: [billingAddressId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  shippingAddressId String            @db.Uuid
+  shippingAddress   Address           @relation("ShippingAddress", fields: [shippingAddressId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  placedAt          DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  deletedAt         DateTime?
+
+  items     OrderItem[]
+  payments  Payment[]
+  shipments Shipment[]
+
+  @@index([customerId])
+  @@index([billingAddressId])
+  @@index([shippingAddressId])
+  @@map("orders")
+}
+
+model OrderItem {
+  id           String         @id @default(uuid()) @db.Uuid
+  orderId      String         @db.Uuid
+  order        Order          @relation(fields: [orderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  variantId    String         @db.Uuid
+  variant      ProductVariant @relation(fields: [variantId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  nameSnapshot String
+  skuSnapshot  String
+  unitPrice    Decimal        @db.Decimal(10, 2)
+  qty          Int
+
+  @@index([orderId])
+  @@index([variantId])
+  @@map("order_items")
+}
+
+model Payment {
+  id          String        @id @default(uuid()) @db.Uuid
+  orderId     String        @db.Uuid
+  order       Order         @relation(fields: [orderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  provider    String
+  providerRef String        @unique
+  amount      Decimal       @db.Decimal(10, 2)
+  currency    String
+  status      PAYMENTSTATUS
+  method      String
+  capturedAt  DateTime?
+  updatedAt   DateTime      @updatedAt
+
+  refunds Refund[]
+
+  @@index([orderId])
+  @@map("payments")
+}
+
+model Refund {
+  id        String       @id @default(uuid()) @db.Uuid
+  paymentId String       @db.Uuid
+  payment   Payment      @relation(fields: [paymentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  amount    Decimal      @db.Decimal(10, 2)
+  reason    String
+  status    REFUNDSTATUS
+
+  @@index([paymentId])
+  @@map("refunds")
+}
+
+model Shipment {
+  id          String         @id @default(uuid()) @db.Uuid
+  orderId     String         @db.Uuid
+  order       Order          @relation(fields: [orderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  carrier     String
+  trackingNo  String         @unique
+  labelUrl    String?
+  status      SHIPMENTSTATUS
+  shippedAt   DateTime?
+  deliveredAt DateTime?
+  updatedAt   DateTime       @updatedAt
+
+  @@index([orderId])
+  @@map("shipments")
+}
+
+model Promotion {
+  id         String        @id @default(uuid()) @db.Uuid
+  code       String
+  type       PROMOTIONTYPE
+  value      Decimal       @db.Decimal(10, 2)
+  startsAt   DateTime?
+  endsAt     DateTime?
+  usageLimit Int?
+  usedCount  Int           @default(0)
+
+  @@map("promotions")
+}
+
+enum PROVIDER {
+  GOOGLE
+  LOCAL
+}
+
+enum Status {
+  ACTIVE
+  INACTIVE
+}
+
+enum ORDERSTATUS {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum PAYMENTSTATUS {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum FULFILLMENTSTATUS {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+}
+
+enum REFUNDSTATUS {
+  PENDING
+  APPROVED
+  REJECTED
+  COMPLETED
+}
+
+enum SHIPMENTSTATUS {
+  PENDING
+  SHIPPED
+  DELIVERED
+  DELAYED
+}
+
+enum PROMOTIONTYPE {
+  PERCENTAGE
+  FIXED
+}
+
+enum REASON {
+  DAMAGED
+  LOST
+  WRONG_ITEM
+  OTHER
+}
+
+// model Webhook {
+//   id          String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+//   source      String
+//   eventType   String
+//   payload     Json?
+//   receivedAt  DateTime @default(now())
+//   processedAt DateTime?
+
+//   @@map("webhooks")
+// }
+
+// model OutboxEvent {
+//   id           String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+//   eventType    String
+//   aggregateId  String
+//   payload      Json?
+//   occurredAt   DateTime @default(now())
+//   processedAt  DateTime?
+
+//   @@map("outbox_events")
+// }
