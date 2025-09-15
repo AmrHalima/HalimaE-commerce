@@ -6,7 +6,7 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../generated/prisma"
+  output   = "../node_modules/.prisma/client"
 }
 
 datasource db {
@@ -114,6 +114,16 @@ model CollectionProduct {
   @@index([productId])
 }
 
+model Role {
+  id   String @id @default(uuid()) @db.Uuid
+  name String
+
+  users       User[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
 model User {
   id           String    @id @default(uuid()) @db.Uuid
   email        String    @unique
@@ -122,19 +132,11 @@ model User {
   name         String
   passwordHash String
 
-  roles     UserRole[]
+  roleId String? @db.Uuid
+  role   Role?   @relation(fields: [roleId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
+  @@index([roleId])
   @@map("users")
-}
-
-model Role {
-  id   String @id @default(uuid()) @db.Uuid
-  name String
-
-  userRoles   UserRole[]
-  permissions RolePermission[]
-
-  @@map("roles")
 }
 
 model Permission {
@@ -146,20 +148,8 @@ model Permission {
   @@map("permissions")
 }
 
-model UserRole {
-  userId String @db.Uuid()
-  roleId String @db.Uuid()
-  user   User   @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  role   Role   @relation(fields: [roleId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-
-  @@id([userId, roleId])
-  @@index([userId])
-  @@index([roleId])
-  @@map("user_roles")
-}
-
 model RolePermission {
-  roleId       String     @db.Uuid()  
+  roleId       String     @db.Uuid()
   permissionId String     @db.Uuid()
   role         Role       @relation(fields: [roleId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   permission   Permission @relation(fields: [permissionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
