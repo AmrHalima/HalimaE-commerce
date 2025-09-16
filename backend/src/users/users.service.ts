@@ -26,14 +26,14 @@ export class UsersService {
   async findById(id: string) {
     return this.prisma.user.findUnique({
       where: { id },
-      include: { role: true },
+      include: { role: { select: { name: true } }},
     });
   }
 
   async findByEmail(email: string) {
     return this.prisma.user.findUnique({
-      where: { email },
-      include: { role: true },
+      where: { email: email },
+      include: { role: { select: { name: true } }},
     });
   }
 
@@ -41,7 +41,7 @@ export class UsersService {
     const { roleId, ...rest } = dto as any;
     const roleUpdate = roleId === null ? { disconnect: true } : roleId ? { connect: { id: roleId } } : undefined;
     return this.prisma.user.update({
-      where: { id },
+      where: { id: id },
       data: {
         ...rest,
         role: roleUpdate,

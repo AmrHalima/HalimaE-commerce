@@ -4,13 +4,13 @@ import { UsersService } from 'src/users/users.service';
 import * as argon2 from 'argon2';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../prisma/prisma.service';
+import { OmitType } from '@nestjs/mapped-types';
 
 @Injectable()
 export class UserAuthService {
     constructor(
         private readonly userService: UsersService,
         private readonly jwtService: JwtService,
-        private prisma: PrismaService
     ) { }
 
     async signup(dto: CreateUserDto) {
@@ -33,11 +33,12 @@ export class UserAuthService {
         const payload = {
             sub: user.id,
             email: user.email,
-            roles: user.role?.name
+            role: user.role?.name
         }
 
+        const { passwordHash, ...userWithoutPassword } = user;
         return {
-            user,
+            user: userWithoutPassword,
             access_token: await this.jwtService.signAsync(payload)
         }
     }

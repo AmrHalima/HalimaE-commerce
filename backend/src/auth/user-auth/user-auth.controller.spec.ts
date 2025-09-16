@@ -64,7 +64,7 @@ describe('UserAuthController', () => {
             email: 'test@example.com',
             password: 'password',
             name: 'test',
-            roles: ['USER']
+            roleId: 'admin'
         };
         const expectedResult = {
             user: { id: '1', email: 'test@example.com', roles: ['USER'] },

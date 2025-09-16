@@ -1,6 +1,8 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { CreateUserDto, LoginUserDto } from 'src/users/dto';
 import { UserAuthService } from './user-auth.service';
+import { Roles } from './decorators';
+import { JwtUserGuard, RolesGuard } from './guards';
 @Controller('admin/auth')
 export class UserAuthController {
     constructor(
