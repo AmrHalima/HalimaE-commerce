@@ -24,7 +24,6 @@ describe('UserAuthController', () => {
                 provide: UserAuthService,
                 useValue: mockUserAuthService,
             },
-            // Mock other dependencies of UserAuthService if needed
             {
                 provide: UsersService,
                 useValue: {
