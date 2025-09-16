@@ -1,6 +1,8 @@
 import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { CreateUserDto, LoginUserDto } from '../../users/dto';
 import { UserAuthService } from './user-auth.service';
+import { JwtUserGuard, RolesGuard } from './guards';
+import { Roles } from './decorators';
 
 @Controller('admin/auth')
 export class UserAuthController {
@@ -8,6 +10,9 @@ export class UserAuthController {
         private readonly authService: UserAuthService
     ) { }
 
+    // only admin can add new useres
+    @Roles('admin')
+    @UseGuards(JwtUserGuard, RolesGuard)
     @Post('signup')
     async signup(@Body() dto: CreateUserDto) {
         return await this.authService.signup(dto);
