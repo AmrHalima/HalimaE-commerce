@@ -1,10 +1,7 @@
 import { Injectable, ConflictException, ForbiddenException } from '@nestjs/common';
-import { CreateUserDto, LoginUserDto } from 'src/users/dto';
-import { UsersService } from 'src/users/users.service';
-import * as argon2 from 'argon2';
+import { CreateUserDto, LoginUserDto } from '../../users/dto';
+import { UsersService } from '../../users/users.service';
 import { JwtService } from '@nestjs/jwt';
-import { PrismaService } from '../../prisma/prisma.service';
-import { OmitType } from '@nestjs/mapped-types';
 
 @Injectable()
 export class UserAuthService {

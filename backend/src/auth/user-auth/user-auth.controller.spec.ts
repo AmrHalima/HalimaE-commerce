@@ -1,10 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UserAuthController } from './user-auth.controller';
 import { UserAuthService } from './user-auth.service';
-import { CreateUserDto, LoginUserDto } from 'src/users/dto';
-import { UsersService } from 'src/users/users.service';
+import { CreateUserDto, LoginUserDto } from '../../users/dto';
+import { UsersService } from '../../users/users.service';
 import { JwtService } from '@nestjs/jwt';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { PrismaService } from '../../prisma/prisma.service';
 
 describe('UserAuthController', () => {
   let controller: UserAuthController;
@@ -30,6 +30,8 @@ describe('UserAuthController', () => {
                 useValue: {
                     create: jest.fn(),
                     findByEmail: jest.fn(),
+                    update: jest.fn(),
+                    delete: jest.fn(),
                 },
             },
             {
@@ -44,6 +46,9 @@ describe('UserAuthController', () => {
                     user: {
                         create: jest.fn(),
                         findFirst: jest.fn(),
+                        findUnique: jest.fn(),
+                        update: jest.fn(),
+                        delete: jest.fn(),
                     },
                 },
             },
@@ -64,10 +69,10 @@ describe('UserAuthController', () => {
             email: 'test@example.com',
             password: 'password',
             name: 'test',
-            roleId: 'admin'
+            roleId: 'b94da66f-bb5b-4e25-9c6e-4e84af84df4f'
         };
         const expectedResult = {
-            user: { id: '1', email: 'test@example.com', roles: ['USER'] },
+            user: { id: '1', email: 'test@example.com', name: 'test' ,role: 'admin' },
             access_token: 'some-token',
         };
         mockUserAuthService.signup.mockResolvedValue(expectedResult);
@@ -86,7 +91,7 @@ describe('UserAuthController', () => {
             password: 'password',
         };
         const expectedResult = {
-            user: { id: '1', email: 'test@example.com', roles: ['USER'] },
+            user: { id: '1', email: 'test@example.com', name: 'test', role: 'admin' },
             access_token: 'some-token',
         };
         mockUserAuthService.login.mockResolvedValue(expectedResult);
