@@ -5,7 +5,7 @@ import * as fs from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'crypto';
 
-export const UPLOAD_DIR = join(process.cwd(), 'public', 'images', 'products');
+export const UPLOAD_DIR = join(process.cwd(), 'public', 'uploads', 'images', 'products');
 
 export const TEMP_PATH = join(UPLOAD_DIR, 'temp');
 if (!fs.existsSync(TEMP_PATH)) {
