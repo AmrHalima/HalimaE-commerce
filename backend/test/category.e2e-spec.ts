@@ -1,10 +1,9 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { CreateUserDto } from '../src/users/dto';
 import { UsersService } from '../src/users/users.service';
+import { setupE2ETest } from './jest-e2e.setup';
 
 describe('CategoryController (e2e)', () => {
     let app: INestApplication;
@@ -20,21 +19,7 @@ describe('CategoryController (e2e)', () => {
     const categoryIds: string[] = [];
 
     beforeAll(async () => {
-        const moduleFixture: TestingModule = await Test.createTestingModule({
-            imports: [AppModule],
-        }).compile();
-
-        app = moduleFixture.createNestApplication();
-        prisma = app.get<PrismaService>(PrismaService);
-
-        app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
-        app.setGlobalPrefix('/api');
-        await app.init();
-
-        // Clean up database before tests
-        await prisma.category.deleteMany();
-        await prisma.user.deleteMany();
-        await prisma.role.deleteMany();
+        ({ app, prisma } = await setupE2ETest());
 
         // 1. Create Roles
         const adminRole = await prisma.role.create({ data: { name: 'admin' } });
@@ -77,10 +62,6 @@ describe('CategoryController (e2e)', () => {
     }, 30000); // Set timeout to 30 seconds for setup
 
     afterAll(async () => {
-        // Cleanup
-        await prisma.category.deleteMany({ where: { id: { in: categoryIds } } });
-        await prisma.user.deleteMany({ where: { id: { in: [adminUserId, employeeUserId] } } });
-        await prisma.role.deleteMany({ where: { id: { in: [adminRoleId, employeeRoleId] } } });
         // No need to call prisma.$disconnect() here, app.close() handles it.
         await app.close();
     });

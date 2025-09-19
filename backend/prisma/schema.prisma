@@ -37,8 +37,8 @@ model Product {
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
-  categoryId  String?             @db.Uuid
-  category    Category?           @relation(fields: [categoryId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  categoryId  String              @db.Uuid
+  category    Category            @relation(fields: [categoryId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   variants    ProductVariant[]
   images      ProductImage[]
   collections CollectionProduct[]
