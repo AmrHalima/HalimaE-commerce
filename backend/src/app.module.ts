@@ -6,11 +6,63 @@ import { AuthModule } from './auth/auth.module';
 import { ProductModule } from './product/product.module';
 import { CategoryModule } from './category/category.module';
 import { LogService } from './logger/log.service';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
 @Module({
-  imports: [ConfigModule.forRoot({
-    isGlobal: true,
-  }), PrismaModule, UsersModule, AuthModule, ProductModule, CategoryModule],
-  providers: [LogService],
+    imports: [
+        ConfigModule.forRoot({
+            isGlobal: true,
+        }),
+        PrismaModule,
+        UsersModule,
+        AuthModule,
+        ProductModule,
+        CategoryModule,
+        ThrottlerModule.forRoot({
+            throttlers: [
+                {
+                    name: 'short',
+                    ttl: 1000,
+                    limit: 3,
+                },
+                {
+                    name: 'medium',
+                    ttl: 10000,
+                    limit: 20
+                },
+                {
+                    ttl: 60000,
+                    limit: 100
+                }
+            ],
+        }),
+    ],
+    providers: [
+        LogService,
+        {
+            provide: 'APP_NAME',
+            useValue: 'HalimaE-commerce',
+        },
+        {
+            provide: 'APP_VERSION',
+            useValue: '1.0.0',
+        },
+        {
+            provide: 'APP_DESCRIPTION',
+            useValue: 'HalimaE-commerce',
+        },
+        {
+            provide: 'APP_LICENSE',
+            useValue: 'MIT',
+        },
+        {
+            provide: 'APP_LICENSE_URL',
+            useValue: 'https://opensource.org/licenses/MIT',
+        },
+        {
+            provide: 'APP_GUARD',
+            useClass: ThrottlerGuard
+        }
+    ],
 })
 export class AppModule {}
