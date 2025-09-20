@@ -1,11 +1,23 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe, Logger } from '@nestjs/common';
+import { ServeStaticModule } from '@nestjs/serve-static';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { join } from 'path';
 
 export async function setupE2ETest() {
     const moduleFixture: TestingModule = await Test.createTestingModule({
-        imports: [AppModule],
+        imports: [
+            AppModule,
+            // This module is what allows the test server to serve the uploaded images.
+            // It maps the URL path '/images/products' to the physical directory 'public/uploads/products'.
+            ServeStaticModule.forRoot({
+                // The URL path to serve static files from
+                serveRoot: '/images/products',
+                // The physical directory where the files are located
+                rootPath: join(__dirname, '..', 'public', 'uploads', 'products'),
+            }),
+        ],
     }).compile();
 
     const app: INestApplication = moduleFixture.createNestApplication();
