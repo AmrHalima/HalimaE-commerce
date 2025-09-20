@@ -5,7 +5,6 @@ import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { ProductModule } from './product/product.module';
 import { CategoryModule } from './category/category.module';
-import { LogService } from './logger/log.service';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
 @Module({
@@ -38,7 +37,6 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
         }),
     ],
     providers: [
-        LogService,
         {
             provide: 'APP_NAME',
             useValue: 'HalimaE-commerce',

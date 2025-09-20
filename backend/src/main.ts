@@ -16,7 +16,7 @@ async function bootstrap() {
 
   app.disable('x-powered-by');
 
-  app.useLogger(app.get('LogService'));
+//   app.useLogger(app.get('LogService'));
   
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true,
