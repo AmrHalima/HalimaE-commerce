@@ -143,6 +143,15 @@ describe('ProductController (e2e)', () => {
             expect(addImageResponse.body[0].alt).toBe(imagesMeta[0].alt);
 
             imageId = addImageResponse.body[0].id;
+
+            // Step 3: Verify the image can be served via its URL
+            const imageUrl = addImageResponse.body[0].url;
+            const serveImageResponse = await request(app.getHttpServer())
+                .get(imageUrl) // The URL is relative, e.g., /images/products/....
+                .expect(200);
+
+            // Check if the content type is correct for the uploaded PNG
+            expect(serveImageResponse.headers['content-type']).toBe('image/png');
         });
     });
 

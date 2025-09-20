@@ -6,6 +6,15 @@ import { join } from 'path';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  app.enableCors({
+    origin: '*',
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    credentials: true,
+  });
+
+  app.disable('x-powered-by');
+
+  app.useLogger(app.get('LogService'));
   
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true,
