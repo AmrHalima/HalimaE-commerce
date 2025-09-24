@@ -1,9 +1,10 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { ValidationPipe } from '@nestjs/common';
+import { LoggerService, ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import helmet from 'helmet';
+import { LogService } from './logger/log.service';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -16,7 +17,7 @@ async function bootstrap() {
 
   app.disable('x-powered-by');
 
-//   app.useLogger(app.get('LogService'));
+  app.useLogger(app.get<LoggerService>(LogService));
   
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true,

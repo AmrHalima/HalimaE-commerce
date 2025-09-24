@@ -1,10 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe, Logger } from '@nestjs/common';
+import { INestApplication, ValidationPipe, LoggerService } from '@nestjs/common';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { join } from 'path';
 import { ThrottlerGuard } from '@nestjs/throttler';
+import { LogService } from '../src/logger/log.service';
 
 async function cleanDatabase(prisma: PrismaService) {
     // Delete in order of dependency
@@ -45,7 +46,7 @@ export async function setupE2ETest() {
         transform: true,
         transformOptions: { enableImplicitConversion: true },
     }));
-    app.useLogger(new Logger('E2E'));
+    app.useLogger(app.get<LoggerService>(LogService));
     app.setGlobalPrefix('/api');
     await app.init();
 

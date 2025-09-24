@@ -7,12 +7,12 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as argon2 from 'argon2';
 import { setupE2ETest, teardownE2ETest } from './jest-e2e.setup';
+import { LogService } from '../src/logger/log.service';
 
 describe('ProductController (e2e)', () => {
     let app: INestApplication;
-    let logger: LoggerService = new Logger('E2E-Product');
+    let logger: LoggerService;
     let prisma: PrismaService;
-    let adminUserId: string;
     let authToken: string;
     let categoryId: string;
     let productId: string;
@@ -28,6 +28,7 @@ describe('ProductController (e2e)', () => {
         fs.writeFileSync(testImagePath, Buffer.from(base64Image, 'base64'));
 
         ({ app, prisma } = await setupE2ETest());
+        logger = app.get<LoggerService>(LogService);
 
         // 2. Create a test user and get auth token
         let role = await prisma.role.findFirst({
@@ -50,9 +51,8 @@ describe('ProductController (e2e)', () => {
                 roleId: role.id,
             },
         });
-        adminUserId = user.id;
 
-        logger.log(`User created: ${JSON.stringify(user)}`);
+        logger.debug?.(`User created: ${JSON.stringify(user)}`, 'E2E-Product');
 
         const loginResponse = await request(app.getHttpServer())
             .post('/api/admin/auth/login')
@@ -67,7 +67,7 @@ describe('ProductController (e2e)', () => {
             create: { name: 'E2E Test Category', slug: 'e2e-test-category' },
         });
         categoryId = category.id;
-        logger.log(`Category created: ${JSON.stringify(category)}`);
+        logger.log(`Category created: ${JSON.stringify(category)}`, 'E2E-Product');
     }, 30000);
 
     afterAll(async () => {
@@ -105,15 +105,15 @@ describe('ProductController (e2e)', () => {
                 categoryId: categoryId,
                 variants: [variantDto],
             };
-            logger.log(`Creating product with DTO: ${JSON.stringify(createDto)}`);
+            logger.log(`Creating product with DTO: ${JSON.stringify(createDto)}`, 'E2E-Product');
 
             const createResponse = await request(app.getHttpServer())
                 .post('/api/products')
                 .set('Authorization', `Bearer ${authToken}`)
                 .send(createDto);
 
-            logger.log(`Create Response status: ${createResponse.status}`);
-            logger.log(`Create Response: ${JSON.stringify(createResponse.body)}`);
+            logger.log(`Create Response status: ${createResponse.status}`, 'E2E-Product');
+            logger.log(`Create Response: ${JSON.stringify(createResponse.body)}`, 'E2E-Product');
 
             expect(createResponse.status).toBe(201);
             expect(createResponse.body).toHaveProperty('id');
@@ -133,8 +133,8 @@ describe('ProductController (e2e)', () => {
                 .field('imagesMeta', JSON.stringify(imagesMeta))
                 .attach('images', testImagePath);
 
-            logger.log(`Add Image Response status: ${addImageResponse.status}`);
-            logger.log(`Add Image Response: ${JSON.stringify(addImageResponse.body)}`);
+            logger.log(`Add Image Response status: ${addImageResponse.status}`, 'E2E-Product');
+            logger.log(`Add Image Response: ${JSON.stringify(addImageResponse.body)}`, 'E2E-Product');
 
             expect(addImageResponse.status).toBe(201);
             expect(addImageResponse.body).toBeInstanceOf(Array);
