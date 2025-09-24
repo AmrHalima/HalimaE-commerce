@@ -119,7 +119,7 @@ model Role {
   name String
 
   users       User[]
-  permissions RolePermission[]
+//   permissions RolePermission[]`
 
   @@map("roles")
 }
@@ -139,26 +139,26 @@ model User {
   @@map("users")
 }
 
-model Permission {
-  id   String @id @default(uuid()) @db.Uuid
-  name String
+// model Permission {
+//   id   String @id @default(uuid()) @db.Uuid
+//   name String
 
-  roles RolePermission[]
+//   roles RolePermission[]
 
-  @@map("permissions")
-}
+//   @@map("permissions")
+// }
 
-model RolePermission {
-  roleId       String     @db.Uuid()
-  permissionId String     @db.Uuid()
-  role         Role       @relation(fields: [roleId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+// model RolePermission {
+//   roleId       String     @db.Uuid()
+//   permissionId String     @db.Uuid()
+//   role         Role       @relation(fields: [roleId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+//   permission   Permission @relation(fields: [permissionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
-  @@id([roleId, permissionId])
-  @@index([roleId])
-  @@index([permissionId])
-  @@map("role_permissions")
-}
+//   @@id([roleId, permissionId])
+//   @@index([roleId])
+//   @@index([permissionId])
+//   @@map("role_permissions")
+// }
 
 model Customer {
   id           String    @id @default(uuid()) @db.Uuid
@@ -187,7 +187,6 @@ model Address {
   line1      String
   line2      String?
   city       String
-  region     String?
   country    String
   postalCode String
   isDefault  Boolean  @default(false)

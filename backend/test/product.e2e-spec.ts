@@ -6,7 +6,7 @@ import { Status } from '@prisma/client';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as argon2 from 'argon2';
-import { setupE2ETest } from './jest-e2e.setup';
+import { setupE2ETest, teardownE2ETest } from './jest-e2e.setup';
 
 describe('ProductController (e2e)', () => {
     let app: INestApplication;
@@ -75,7 +75,7 @@ describe('ProductController (e2e)', () => {
         if (fs.existsSync(testImagePath)) {
             fs.unlinkSync(testImagePath);
         }
-        await app.close();
+        await teardownE2ETest(app, prisma);
     });
 
     describe('POST /products', () => {

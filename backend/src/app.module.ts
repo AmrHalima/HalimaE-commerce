@@ -6,6 +6,7 @@ import { AuthModule } from './auth/auth.module';
 import { ProductModule } from './product/product.module';
 import { CategoryModule } from './category/category.module';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { CustomerModule } from './customer/customer.module';
 
 @Module({
     imports: [
@@ -19,22 +20,12 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
         CategoryModule,
         ThrottlerModule.forRoot({
             throttlers: [
-                {
-                    name: 'short',
-                    ttl: 1000,
-                    limit: 3,
-                },
-                {
-                    name: 'medium',
-                    ttl: 10000,
-                    limit: 20
-                },
-                {
-                    ttl: 60000,
-                    limit: 100
-                }
+                { name: 'short', ttl: 1000, limit: 3 },
+                { name: 'medium', ttl: 10000, limit: 20 },
+                { name: 'long', ttl: 60000, limit: 100 },
             ],
         }),
+        CustomerModule,
     ],
     providers: [
         {
@@ -57,10 +48,13 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
             provide: 'APP_LICENSE_URL',
             useValue: 'https://opensource.org/licenses/MIT',
         },
-        {
-            provide: 'APP_GUARD',
-            useClass: ThrottlerGuard
-        }
+        ...(process.env.NODE_ENV === 'test'
+            ? []
+            : [{
+                provide: 'APP_GUARD',
+                useClass: ThrottlerGuard
+            }]
+        )
     ],
 })
 export class AppModule {}
