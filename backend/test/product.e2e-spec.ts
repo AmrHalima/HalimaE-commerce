@@ -8,9 +8,10 @@ import * as fs from 'fs';
 import * as argon2 from 'argon2';
 import { setupE2ETest, teardownE2ETest } from './jest-e2e.setup';
 import { LogService } from '../src/logger/log.service';
+import { NestExpressApplication } from '@nestjs/platform-express';
 
 describe('ProductController (e2e)', () => {
-    let app: INestApplication;
+    let app: NestExpressApplication;
     let logger: LoggerService;
     let prisma: PrismaService;
     let authToken: string;

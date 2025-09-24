@@ -6,6 +6,7 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { join } from 'path';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { LogService } from '../src/logger/log.service';
+import { NestExpressApplication } from '@nestjs/platform-express';
 
 async function cleanDatabase(prisma: PrismaService) {
     // Delete in order of dependency
@@ -30,23 +31,28 @@ export async function setupE2ETest() {
             AppModule,
             // This module is what allows the test server to serve the uploaded images.
             // It maps the URL path '/images/products' to the physical directory 'public/uploads/products'.
-            ServeStaticModule.forRoot({
-                // The URL path to serve static files from
-                serveRoot: '/images/products',
-                // The physical directory where the files are located
-                rootPath: join(__dirname, '..', 'public', 'uploads', 'products'),
-            }),
+            // ServeStaticModule.forRoot({
+            //     // The URL path to serve static files from
+            //     serveRoot: '/images/products',
+            //     // The physical directory where the files are located
+            //     rootPath: join(__dirname, '..', 'public', 'uploads', 'products'),
+            // }),
         ],
     })
     .compile()
 
-    const app: INestApplication = moduleFixture.createNestApplication();
+    const app = moduleFixture.createNestApplication<NestExpressApplication>();
     app.useGlobalPipes(new ValidationPipe({
         whitelist: true,
         transform: true,
         transformOptions: { enableImplicitConversion: true },
     }));
     app.useLogger(app.get<LoggerService>(LogService));
+    // This is the key change. It maps the physical directory where images are stored
+    // to the URL path that the ProductImageService generates.
+    app.useStaticAssets(join(__dirname, '..', 'public', 'uploads'), {
+        prefix: '/images/',
+    });
     app.setGlobalPrefix('/api');
     await app.init();
 

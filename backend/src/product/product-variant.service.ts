@@ -90,7 +90,7 @@ export class ProductVariantService {
         });
     }
 
-    async delete(productId: string, id: string, tx: Prisma.TransactionClient = this.prisma) {
+    async delete(productId: string, id: string, tx: Prisma.TransactionClient = this.prisma): Promise<void> {
         this.logger.debug(`Attempting to delete variant ${id} from product ${productId}`, ProductVariantService.name);
         const variant = await tx.productVariant.findUnique({
             where: { id },
@@ -110,8 +110,7 @@ export class ProductVariantService {
         await tx.variantPrice.deleteMany({ where: { variantId: id } });
         await tx.variantInventory.deleteMany({ where: { variantId: id } });
 
-        return tx.productVariant.delete({ where: { id } });
+        await tx.productVariant.delete({ where: { id } });
         this.logger.log(`Successfully deleted variant ${id} from product ${productId}`, ProductVariantService.name);
-        return;
     }
 }

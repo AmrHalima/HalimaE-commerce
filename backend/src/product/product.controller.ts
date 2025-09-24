@@ -151,7 +151,7 @@ export class ProductController {
     @UseGuards(JwtUserGuard, RolesGuard)
     @HttpCode(HttpStatus.NO_CONTENT)
     async removeProduct(@Param('id') id: string) {
-        return this.productService.remove(id);
+        await this.productService.remove(id);
     }
 
 
@@ -160,7 +160,7 @@ export class ProductController {
     @UseGuards(JwtUserGuard, RolesGuard)
     @HttpCode(HttpStatus.NO_CONTENT)
     async removeVariant(@Param('id') id: string, @Param('variantId') variantId: string) {
-        return this.productVariantService.delete(id, variantId);
+        await this.productVariantService.delete(id, variantId);
     }
 
 
@@ -169,6 +169,6 @@ export class ProductController {
     @UseGuards(JwtUserGuard, RolesGuard)
     @HttpCode(HttpStatus.NO_CONTENT)
     async removeImage(@Param('id') id: string, @Param('imageId') imageId: string) {
-        return this.productImageService.delete(id, imageId);
+        await this.productImageService.delete(id, imageId);
     }
 }

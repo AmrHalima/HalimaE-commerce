@@ -146,9 +146,9 @@ export class ProductService {
         return updatedProduct;
     }
 
-    async remove(id: string) {
+    async remove(id: string): Promise<void> {
         this.logger.debug(`Attempting to remove product with ID: ${id}`, ProductService.name);
-         return this.prisma.$transaction(async (tx) => {
+         await this.prisma.$transaction(async (tx) => {
             const product = await tx.product.findUnique({
                 where: { id: id },
                 include: { images: true },
@@ -180,7 +180,6 @@ export class ProductService {
             await tx.product.delete({ where: { id } });
 
             this.logger.log(`Successfully removed product with ID: ${id}`, ProductService.name);
-            return { message: `Product with ID ${id} and its assets have been deleted.` };
         });
     }
 }   
