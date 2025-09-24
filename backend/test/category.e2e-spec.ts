@@ -3,15 +3,13 @@ import request from 'supertest';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { CreateUserDto } from '../src/users/dto';
 import { UsersService } from '../src/users/users.service';
-import { setupE2ETest } from './jest-e2e.setup';
+import { setupE2ETest, teardownE2ETest } from './jest-e2e.setup';
 
 describe('CategoryController (e2e)', () => {
     let app: INestApplication;
     let prisma: PrismaService;
     let adminToken: string;
     let employeeToken: string;
-    let adminUserId: string;
-    let employeeUserId: string;
     let adminRoleId: string;
     let employeeRoleId: string;
 
@@ -34,7 +32,6 @@ describe('CategoryController (e2e)', () => {
         // We can't use the signup endpoint as it requires an admin token.
         const usersService = app.get(UsersService);
         const adminUser = await usersService.create(adminDto);
-        adminUserId = adminUser.id;
         
         // 3. Log in as the seeded admin to get a token
         const adminLoginRes = await request(app.getHttpServer())
@@ -52,7 +49,6 @@ describe('CategoryController (e2e)', () => {
         // Retrieve the created employee to get their ID for cleanup
         const employeeUser = await prisma.user.findUnique({ where: { email: employeeDto.email } });
         expect(employeeUser).not.toBeNull();
-        employeeUserId = employeeUser!.id;
 
         // 5. Log in as the new employee to get their token
         const employeeLoginRes = await request(app.getHttpServer())
@@ -62,8 +58,7 @@ describe('CategoryController (e2e)', () => {
     }, 30000); // Set timeout to 30 seconds for setup
 
     afterAll(async () => {
-        // No need to call prisma.$disconnect() here, app.close() handles it.
-        await app.close();
+        await teardownE2ETest(app, prisma);
     });
 
     describe('/categories (POST)', () => {

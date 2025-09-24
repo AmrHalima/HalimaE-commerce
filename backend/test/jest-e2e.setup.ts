@@ -4,6 +4,24 @@ import { ServeStaticModule } from '@nestjs/serve-static';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { join } from 'path';
+import { ThrottlerGuard } from '@nestjs/throttler';
+
+async function cleanDatabase(prisma: PrismaService) {
+    // Delete in order of dependency
+    await prisma.variantPrice.deleteMany();
+    await prisma.variantInventory.deleteMany();
+    await prisma.productVariant.deleteMany();
+    await prisma.productImage.deleteMany();
+    await prisma.product.deleteMany();
+    await prisma.category.deleteMany();
+    await prisma.user.deleteMany();
+    await prisma.role.deleteMany();
+    // Assuming these models exist based on schema comments
+    await prisma.address.deleteMany();
+    // await prisma.cart.deleteMany();
+    // await prisma.order.deleteMany();
+    await prisma.customer.deleteMany();
+}
 
 export async function setupE2ETest() {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -18,7 +36,8 @@ export async function setupE2ETest() {
                 rootPath: join(__dirname, '..', 'public', 'uploads', 'products'),
             }),
         ],
-    }).compile();
+    })
+    .compile()
 
     const app: INestApplication = moduleFixture.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({
@@ -32,15 +51,12 @@ export async function setupE2ETest() {
 
     const prisma = app.get<PrismaService>(PrismaService);
 
-    // Clean all tables
-    await prisma.variantPrice.deleteMany();
-    await prisma.variantInventory.deleteMany();
-    await prisma.productVariant.deleteMany();
-    await prisma.productImage.deleteMany();
-    await prisma.product.deleteMany();
-    await prisma.category.deleteMany();
-    await prisma.user.deleteMany();
-    await prisma.role.deleteMany();
+    await cleanDatabase(prisma);
 
     return { app, prisma };
+}
+
+export async function teardownE2ETest(app: INestApplication, prisma: PrismaService) {
+    await cleanDatabase(prisma);
+    await app.close();
 }
