@@ -45,7 +45,7 @@ CREATE TABLE "public"."Product" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "deletedAt" TIMESTAMP(3),
-    "categoryId" UUID,
+    "categoryId" UUID NOT NULL,
 
     CONSTRAINT "Product_pkey" PRIMARY KEY ("id")
 );
@@ -112,18 +112,6 @@ CREATE TABLE "public"."CollectionProduct" (
 );
 
 -- CreateTable
-CREATE TABLE "public"."users" (
-    "id" UUID NOT NULL,
-    "email" TEXT NOT NULL,
-    "provider" "public"."PROVIDER",
-    "providerId" TEXT,
-    "name" TEXT NOT NULL,
-    "passwordHash" TEXT NOT NULL,
-
-    CONSTRAINT "users_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
 CREATE TABLE "public"."roles" (
     "id" UUID NOT NULL,
     "name" TEXT NOT NULL,
@@ -132,27 +120,16 @@ CREATE TABLE "public"."roles" (
 );
 
 -- CreateTable
-CREATE TABLE "public"."permissions" (
+CREATE TABLE "public"."users" (
     "id" UUID NOT NULL,
+    "email" TEXT NOT NULL,
+    "provider" "public"."PROVIDER",
+    "providerId" TEXT,
     "name" TEXT NOT NULL,
+    "passwordHash" TEXT NOT NULL,
+    "roleId" UUID,
 
-    CONSTRAINT "permissions_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "public"."user_roles" (
-    "userId" UUID NOT NULL,
-    "roleId" UUID NOT NULL,
-
-    CONSTRAINT "user_roles_pkey" PRIMARY KEY ("userId","roleId")
-);
-
--- CreateTable
-CREATE TABLE "public"."role_permissions" (
-    "roleId" UUID NOT NULL,
-    "permissionId" UUID NOT NULL,
-
-    CONSTRAINT "role_permissions_pkey" PRIMARY KEY ("roleId","permissionId")
+    CONSTRAINT "users_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -179,7 +156,6 @@ CREATE TABLE "public"."addresses" (
     "line1" TEXT NOT NULL,
     "line2" TEXT,
     "city" TEXT NOT NULL,
-    "region" TEXT,
     "country" TEXT NOT NULL,
     "postalCode" TEXT NOT NULL,
     "isDefault" BOOLEAN NOT NULL DEFAULT false,
@@ -334,16 +310,7 @@ CREATE INDEX "CollectionProduct_productId_idx" ON "public"."CollectionProduct"("
 CREATE UNIQUE INDEX "users_email_key" ON "public"."users"("email");
 
 -- CreateIndex
-CREATE INDEX "user_roles_userId_idx" ON "public"."user_roles"("userId");
-
--- CreateIndex
-CREATE INDEX "user_roles_roleId_idx" ON "public"."user_roles"("roleId");
-
--- CreateIndex
-CREATE INDEX "role_permissions_roleId_idx" ON "public"."role_permissions"("roleId");
-
--- CreateIndex
-CREATE INDEX "role_permissions_permissionId_idx" ON "public"."role_permissions"("permissionId");
+CREATE INDEX "users_roleId_idx" ON "public"."users"("roleId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "customers_email_key" ON "public"."customers"("email");
@@ -418,16 +385,7 @@ ALTER TABLE "public"."CollectionProduct" ADD CONSTRAINT "CollectionProduct_colle
 ALTER TABLE "public"."CollectionProduct" ADD CONSTRAINT "CollectionProduct_productId_fkey" FOREIGN KEY ("productId") REFERENCES "public"."Product"("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
 
 -- AddForeignKey
-ALTER TABLE "public"."user_roles" ADD CONSTRAINT "user_roles_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
-
--- AddForeignKey
-ALTER TABLE "public"."user_roles" ADD CONSTRAINT "user_roles_roleId_fkey" FOREIGN KEY ("roleId") REFERENCES "public"."roles"("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
-
--- AddForeignKey
-ALTER TABLE "public"."role_permissions" ADD CONSTRAINT "role_permissions_roleId_fkey" FOREIGN KEY ("roleId") REFERENCES "public"."roles"("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
-
--- AddForeignKey
-ALTER TABLE "public"."role_permissions" ADD CONSTRAINT "role_permissions_permissionId_fkey" FOREIGN KEY ("permissionId") REFERENCES "public"."permissions"("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
+ALTER TABLE "public"."users" ADD CONSTRAINT "users_roleId_fkey" FOREIGN KEY ("roleId") REFERENCES "public"."roles"("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
 
 -- AddForeignKey
 ALTER TABLE "public"."addresses" ADD CONSTRAINT "addresses_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "public"."customers"("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
