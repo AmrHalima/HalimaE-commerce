@@ -3,7 +3,7 @@ import { CustomerService } from '../../customer/customer.service';
 import {
     CreateCustomerDto,
 } from '../../customer/dto';
-import { AuthCustomerDto, CustomerAuthResponseDto } from './dto';
+import { AuthCustomerDto, ResponseAuthCustomerDto } from './dto';
 import * as argon2 from 'argon2';
 import { JwtService } from '@nestjs/jwt';
 import { Status } from '@prisma/client';
@@ -29,7 +29,7 @@ export class CustomerAuthService {
         });
     }
 
-    async login(dto: AuthCustomerDto): Promise<CustomerAuthResponseDto> {
+    async login(dto: AuthCustomerDto): Promise<ResponseAuthCustomerDto> {
         this.logger.debug(`Attempting to log in customer: ${dto.email}`, CustomerAuthService.name);
         const customer = await this.customerService.findByEmail(dto.email);
         if (!customer) {

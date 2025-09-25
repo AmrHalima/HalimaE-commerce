@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { CustomerAuthService } from './customer-auth.service';
 import { CreateCustomerDto } from '../../customer/dto';
-import { AuthCustomerDto, CustomerAuthResponseDto } from './dto';
+import { AuthCustomerDto, ResponseAuthCustomerDto } from './dto';
 
 @Controller('customers/auth')
 export class CustomerAuthController {
@@ -15,13 +15,13 @@ export class CustomerAuthController {
 
     @Post('signup')
     @HttpCode(HttpStatus.CREATED)
-    signup(@Body() dto: CreateCustomerDto): Promise<CustomerAuthResponseDto> {
+    signup(@Body() dto: CreateCustomerDto): Promise<ResponseAuthCustomerDto> {
         return this.customerAuthService.signup(dto);
     }
 
     @Post('login')
     @HttpCode(HttpStatus.OK)
-    login(@Body() dto: AuthCustomerDto): Promise<CustomerAuthResponseDto> {
+    login(@Body() dto: AuthCustomerDto): Promise<ResponseAuthCustomerDto> {
         return this.customerAuthService.login(dto);
     }
 }

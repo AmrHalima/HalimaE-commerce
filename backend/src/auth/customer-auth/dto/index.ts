@@ -1,2 +1,2 @@
-export * from './customer-auth-response.dto';
+export * from './response-auth-customer.dto';
 export * from './auth-customer.dto';
