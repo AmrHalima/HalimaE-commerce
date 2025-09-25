@@ -27,7 +27,7 @@ export class CreateCustomerDto {
     readonly phone?: string;
 
     @IsEnum(Status)
-    readonly status: Status;
+    readonly status: Status = Status.ACTIVE;
 
     @IsOptional()
     @IsString()

@@ -22,6 +22,7 @@ export class CustomerAuthService {
         const customer = await this.customerService.create({
             ...dto,
         });
+        this.logger.debug(`Customer created: ${customer.email}`, CustomerAuthService.name);
         return this.login({
             email: customer.email,
             password: dto.password,
@@ -57,6 +58,7 @@ export class CustomerAuthService {
         return {
             name: customer.name,
             email: customer.email,
+            phone: customer.phone ?? '',
             status: customer.status ?? Status.ACTIVE,
             access_token: await this.jwtService.signAsync(payload),
         };
