@@ -1,11 +1,18 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateCategoryDto, UpdateCategoryDto } from './dto';
+import {
+    CreateCategoryDto,
+    UpdateCategoryDto,
+    ResponseCategoryDto,
+    ResponseCategoriesFilteredDto
+} from './dto';
+import { LogService } from '../logger/log.service';
 
 @Injectable()
 export class CategoryService {
     constructor(
-        private readonly prisma: PrismaService
+        private readonly prisma: PrismaService,
+        private readonly logger: LogService,
     ) { }
 
     async getAllPagenated(
@@ -14,27 +21,44 @@ export class CategoryService {
         orderBy: string         = 'name',
         orderDirection: string  = 'asc',
         search?: string
-    ) {
-        const categories = await this.prisma.category.findMany({
-            skip: (page - 1) * limit,
-            take: limit,
-            orderBy: {
-                [orderBy]: orderDirection
-            },
-            where: {
-                name: {
-                    contains: search
+    ): Promise<ResponseCategoriesFilteredDto> {
+        const [totalCategories, categories] = await this.prisma.$transaction([
+            this.prisma.category.count({where: {name: search }}),
+            this.prisma.category.findMany({
+                skip: (page - 1) * limit,
+                take: limit,
+                orderBy: {
+                    [orderBy]: orderDirection
+                },
+                where: {
+                    name: {
+                        contains: search
+                    }
+                },
+                include: {
+                    parent: true
                 }
-            },
-            include: {
-                parent: true
-            }
-        });
+            }),
+        ]);
 
-        return categories;
+        if (!categories) { 
+            this.logger.warn(`No categories found`, CategoryService.name);
+            throw new NotFoundException("No categories found");
+        }
+
+        const totalPages = Math.ceil(totalCategories / limit);
+
+        return {
+            categories: categories,
+            meta: {
+                totalCategories: totalCategories,
+                totalPages: totalPages,
+                currentPage: page,
+            }
+        };
     }
 
-    async getById(id: string) {
+    async getById(id: string): Promise<ResponseCategoryDto> {
         const category = await this.prisma.category.findUnique({
             where: {
                 id: id
@@ -51,7 +75,7 @@ export class CategoryService {
         return category;
     }
 
-    async getBySlug(slug: string) {
+    async getBySlug(slug: string): Promise<ResponseCategoryDto> {
         const category = await this.prisma.category.findUnique({
             where: {
                 slug: slug
@@ -68,7 +92,7 @@ export class CategoryService {
         return category;
     }
 
-    async create(dto: CreateCategoryDto) {
+    async create(dto: CreateCategoryDto): Promise<ResponseCategoryDto> {
         if (dto.parentId) {
             const parentExists = await this.prisma.category.findUnique({ where: { id: dto.parentId } });
             if (!parentExists) {
@@ -91,7 +115,7 @@ export class CategoryService {
         return category;
     }
 
-    async update(id: string, dto: UpdateCategoryDto) {
+    async update(id: string, dto: UpdateCategoryDto): Promise<ResponseCategoryDto> {
         if (dto.parentId) {
             if (id === dto.parentId) {
                 throw new BadRequestException('A category cannot be its own parent.');
@@ -120,7 +144,7 @@ export class CategoryService {
         return updatedCategory;
     }
 
-    async delete(id: string) {
+    async delete(id: string): Promise<void> {
         const category = await this.prisma.category.findUnique({ where: { id } });
         if (!category) {
             throw new NotFoundException(`Category with ID ${id} not found`);

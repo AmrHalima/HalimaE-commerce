@@ -1,9 +1,10 @@
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, LoggerService } from '@nestjs/common';
 import request from 'supertest';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { CreateUserDto } from '../src/users/dto';
 import { UsersService } from '../src/users/users.service';
 import { setupE2ETest, teardownE2ETest } from './jest-e2e.setup';
+import { LogService } from '../src/logger/log.service';
 
 describe('CategoryController (e2e)', () => {
     let app: INestApplication;
@@ -12,12 +13,14 @@ describe('CategoryController (e2e)', () => {
     let employeeToken: string;
     let adminRoleId: string;
     let employeeRoleId: string;
+    let logger: LoggerService;
 
     // Store created category IDs to clean up
     const categoryIds: string[] = [];
 
     beforeAll(async () => {
         ({ app, prisma } = await setupE2ETest());
+        logger = app.get<LoggerService>(LogService);
 
         // 1. Create Roles
         const adminRole = await prisma.role.create({ data: { name: 'admin' } });
@@ -107,9 +110,11 @@ describe('CategoryController (e2e)', () => {
                 .get('/api/categories')
                 .expect(200);
 
-            expect(Array.isArray(response.body)).toBe(true);
-            expect(response.body.length).toBeGreaterThanOrEqual(2);
-            expect(response.body.find((c: any) => c.slug === 'womens-clothing')).toBeDefined();
+            logger.debug?.(`Response body: ${JSON.stringify(response.body, null, 2)}`, '/categories (GET)');
+
+            expect(Array.isArray(response.body.categories)).toBe(true);
+            expect(response.body.categories.length).toBeGreaterThanOrEqual(2);
+            expect(response.body.categories.find((c: any) => c.slug === 'womens-clothing')).toBeDefined();
         });
     });
 

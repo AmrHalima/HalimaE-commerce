@@ -22,7 +22,6 @@ export class CustomerAuthService {
         const customer = await this.customerService.create({
             ...dto,
         });
-        this.logger.debug(`Customer created: ${customer.email}`, CustomerAuthService.name);
         return this.login({
             email: customer.email,
             password: dto.password,
