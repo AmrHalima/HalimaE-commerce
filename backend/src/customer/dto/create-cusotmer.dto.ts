@@ -7,22 +7,6 @@ import {
 } from "class-validator";
 import { Status } from "@prisma/client";
 
-// model Customer {
-//   id           String    @id @default(uuid()) @db.Uuid
-//   email        String    @unique
-//   provider     PROVIDER?
-//   providerId   String?
-//   name         String
-//   phone        String?
-//   passwordHash String?
-//   status       Status?
-
-//   addresses Address[]
-//   carts     Cart[]
-//   orders    Order[]
-
-//   @@map("customers")
-// }
 export class CreateCustomerDto {
     @IsString()
     @Length(3, 255)
@@ -43,7 +27,7 @@ export class CreateCustomerDto {
     readonly phone?: string;
 
     @IsEnum(Status)
-    readonly status: Status = Status.ACTIVE;
+    readonly status: Status;
 
     @IsOptional()
     @IsString()

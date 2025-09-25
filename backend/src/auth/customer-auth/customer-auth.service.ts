@@ -2,9 +2,8 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { CustomerService } from '../../customer/customer.service';
 import {
     CreateCustomerDto,
-    AuthCustomerDto,
-    UpdateCustomerDto
 } from '../../customer/dto';
+import { AuthCustomerDto, CustomerAuthResponseDto } from './dto';
 import * as argon2 from 'argon2';
 import { JwtService } from '@nestjs/jwt';
 import { Status } from '@prisma/client';
@@ -30,7 +29,7 @@ export class CustomerAuthService {
         });
     }
 
-    async login(dto: AuthCustomerDto) {
+    async login(dto: AuthCustomerDto): Promise<CustomerAuthResponseDto> {
         this.logger.debug(`Attempting to log in customer: ${dto.email}`, CustomerAuthService.name);
         const customer = await this.customerService.findByEmail(dto.email);
         if (!customer) {
@@ -55,9 +54,10 @@ export class CustomerAuthService {
             email: customer.email,
         }
 
-        const { passwordHash, provider, providerId, ...customerWithoutPassword } = customer;
         return {
-            customer: customerWithoutPassword,
+            name: customer.name,
+            email: customer.email,
+            status: customer.status ?? Status.ACTIVE,
             access_token: await this.jwtService.signAsync(payload),
         };
     }
