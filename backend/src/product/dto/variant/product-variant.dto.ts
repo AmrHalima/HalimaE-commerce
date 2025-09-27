@@ -12,33 +12,31 @@ import { VariantInventoryDto } from './variant-inventory.dto';
 export class ProductVariantDto {
     @IsString()
     @IsOptional()
-    public sku: string;
+    readonly sku: string;
 
     @IsString()
     @IsOptional()
-    public size?: string;
+    readonly size?: string | null;
 
     @IsString()
     @IsOptional()
-    public color?: string;
+    readonly color?: string | null;
 
     @IsString()
     @IsOptional()
-    public material?: string;
+    readonly material?: string | null;
 
     @IsBoolean()
     @IsOptional()
-    public isActive?: boolean = true;
+    readonly isActive?: boolean | null = true ;
 
     @IsArray()
     @ValidateNested({ each: true })
     @Type(() => VariantPriceDto)
-    @Transform(({ value }) => (typeof value === 'string' ? JSON.parse(value) : value))
-    public prices: VariantPriceDto[];
+    readonly prices: VariantPriceDto[];
 
     @IsOptional()
     @ValidateNested()
     @Type(() => VariantInventoryDto)
-    @Transform(({ value }) => (typeof value === 'string' ? JSON.parse(value) : value))
-    public inventory?: VariantInventoryDto;
+    readonly inventory?: VariantInventoryDto | null;
 }

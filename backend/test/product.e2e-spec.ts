@@ -162,8 +162,8 @@ describe('ProductController (e2e)', () => {
                 .get('/api/products')
                 .expect(200);
 
-            expect(response.body.data).toBeInstanceOf(Array);
-            expect(response.body.data.length).toBeGreaterThan(0);
+            expect(response.body.products).toBeInstanceOf(Array);
+            expect(response.body.products.length).toBeGreaterThan(0);
             expect(response.body.meta).toBeDefined();
         });
 
@@ -172,8 +172,8 @@ describe('ProductController (e2e)', () => {
                 .get(`/api/products?categoryId=${categoryId}`)
                 .expect(200);
 
-            expect(response.body.data).toHaveLength(1);
-            expect(response.body.data[0].name).toBe('E2E Test T-Shirt');
+            expect(response.body.products).toHaveLength(1);
+            expect(response.body.products[0].name).toBe('E2E Test T-Shirt');
         });
 
         it('should filter products by status', async () => {
@@ -181,15 +181,15 @@ describe('ProductController (e2e)', () => {
                 .get(`/api/products?status=${Status.ACTIVE}`)
                 .expect(200);
 
-            expect(response.body.data.length).toBeGreaterThan(0);
-            expect(response.body.data[0].status).toBe(Status.ACTIVE);
+            expect(response.body.products.length).toBeGreaterThan(0);
+            expect(response.body.products[0].status).toBe(Status.ACTIVE);
         });
 
         it('should filter products by price range', async () => {
             const response = await request(app.getHttpServer())
                 .get('/api/products?priceMin=20&priceMax=30')
                 .expect(200);
-            expect(response.body.data[0].name).toBe('E2E Test T-Shirt');
+            expect(response.body.products[0].name).toBe('E2E Test T-Shirt');
         });
 
         it('should filter products by name', async () => {
@@ -197,7 +197,7 @@ describe('ProductController (e2e)', () => {
                 .get('/api/products?name=E2E Test T-Shirt')
                 .expect(200);
 
-            expect(response.body.data[0].name).toBe('E2E Test T-Shirt');
+            expect(response.body.products[0].name).toBe('E2E Test T-Shirt');
         });
     });
 

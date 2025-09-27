@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProductImageService } from './product-image.service';
 import { ProductVariantService } from './product-variant.service';
-import { CreateProductDto, FilterProductDto, UpdateProductDto } from './dto';
+import { CreateProductDto, FilterProductDto, ResponseProductDto, ResponseProductFilteredDto, ResponseVariantDto, UpdateProductDto } from './dto';
 import { Prisma } from '@prisma/client';
 import { LogService } from '../logger/log.service';
 
@@ -15,7 +15,7 @@ export class ProductService {
         private readonly logger: LogService,
     ) { }
 
-    async findAll(filters: FilterProductDto) {
+    async findAll(filters: FilterProductDto): Promise<ResponseProductFilteredDto> {
         const { name, categoryId, status, page = 1, priceMin = 0, priceMax } = filters;
         const itemsPerPage = 12;
         const skip = (page - 1) * itemsPerPage;
@@ -39,7 +39,7 @@ export class ProductService {
             where.status = status;
         }
 
-        if (priceMin || priceMax) {
+        if (priceMin !== null || priceMax !== null) {
             const priceCondition: any = {};
             if (priceMin) {
                 priceCondition.gte = priceMin;
@@ -57,32 +57,59 @@ export class ProductService {
             };
         }
 
-        const [totalItems, products] = await this.prisma.$transaction([
+        const [totalProducts, products] = await this.prisma.$transaction([
             this.prisma.product.count({ where }),
             this.prisma.product.findMany({
                 where,
-                include: { images: true, variants: { include: { prices: true } } },
                 take: itemsPerPage,
                 skip,
+                include: {
+                    images: {select: {id: true, url: true, alt: true}},
+                    variants: {
+                        select: {
+                            prices: { select: { id: true, compareAt: true, amount: true, currency: true }}, 
+                            id: true,
+                            sku: true,
+                            color: true,
+                            material: true,
+                            isActive: true,
+                            inventory: { select: { id: true, stockOnHand: true, }}, 
+                        }
+                    } 
+                },
             })
         ]);
 
-        const totalPages = Math.ceil(totalItems / itemsPerPage);
+        const totalPages = Math.ceil(totalProducts / itemsPerPage);
 
         return {
-            data: products,
+            products,
             meta: {
-                totalItems,
                 totalPages,
                 currentPage: page,
+                totalProducts,
             },
         };
     }
 
-    async findById(id: string) {
+    async findById(id: string): Promise<ResponseProductDto> {
         this.logger.debug(`Finding product by ID: ${id}`, ProductService.name);
         const product = await this.prisma.product.findUnique({
-            where: { id: id }
+            where: { id: id },
+            include: {
+                images: {select: {id: true, url: true, alt: true}},
+                variants: {
+                    select: {
+                        prices: { select: { id: true, compareAt: true, amount: true, currency: true }}, 
+                        id: true,
+                        sku: true,
+                        color: true,
+                        material: true,
+                        isActive: true,
+                        inventory: { select: { id: true, stockOnHand: true, }}, 
+                    }
+                }
+            },
         });
 
         if (!product) {
@@ -117,7 +144,20 @@ export class ProductService {
                 // 3. Return the complete product with relations
                 return tx.product.findUnique({
                     where: { id: product.id },
-                    include: { variants: { include: { prices: true, inventory: true } }, images: true }
+                    include: {
+                        images: {select: {id: true, url: true, alt: true}},
+                        variants: {
+                            select: {
+                                prices: { select: { id: true, compareAt: true, amount: true, currency: true }}, 
+                                id: true,
+                                sku: true,
+                                color: true,
+                                material: true,
+                                isActive: true,
+                                inventory: { select: { id: true, stockOnHand: true, }}, 
+                            }
+                        } 
+                    },
                 });
             });
 
@@ -129,7 +169,7 @@ export class ProductService {
         }
     }
 
-    async update(id: string, updateProductDto: UpdateProductDto) {
+    async update(id: string, updateProductDto: UpdateProductDto): Promise<ResponseProductDto> {
         this.logger.debug(`Attempting to update product ${id} with DTO: ${JSON.stringify(updateProductDto)}`, ProductService.name);
         
         // Ensure product exists before updating
@@ -139,7 +179,21 @@ export class ProductService {
             where: { id: id },
             data: {
                 ...updateProductDto
-            }
+            },
+            include: {
+                images: {select: {id: true, url: true, alt: true}},
+                variants:{
+                    select: {
+                        prices: { select: { id: true, compareAt: true, amount: true, currency: true }}, 
+                        id: true,
+                        sku: true,
+                        color: true,
+                        material: true,
+                        isActive: true,
+                        inventory: { select: { id: true, stockOnHand: true, }}, 
+                    }
+                } 
+            },
         });
 
         this.logger.log(`Successfully updated product with ID: ${id}`, ProductService.name);
@@ -151,7 +205,7 @@ export class ProductService {
          await this.prisma.$transaction(async (tx) => {
             const product = await tx.product.findUnique({
                 where: { id: id },
-                include: { images: true },
+                select: {id: true ,images: {select: {id: true, alt: true, url: true}} },
             });
 
             if (!product) {

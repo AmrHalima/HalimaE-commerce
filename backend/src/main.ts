@@ -25,6 +25,10 @@ async function bootstrap() {
     transformOptions: { enableImplicitConversion: true },
   }));
   
+  app.useStaticAssets(join(__dirname, '..', 'public', 'uploads'), {
+        prefix: '/images/',
+  });
+  
   app.setGlobalPrefix('/api');
   
   await app.listen(process.env.PORT ?? 3000);

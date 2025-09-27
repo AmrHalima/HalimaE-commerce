@@ -1,16 +1,15 @@
+import { Prisma } from '@prisma/client';
 import { Type } from 'class-transformer';
 import { IsDecimal, IsOptional, IsString } from 'class-validator';
 
 export class VariantPriceDto {
     @IsString()
-    public currency: string;
+    readonly currency: string;
 
     @IsDecimal()
-    @Type(() => String)
-    public amount: string;
+    readonly amount: Prisma.Decimal;
 
     @IsOptional()
     @IsDecimal()
-    @Type(() => String)
-    public compareAt?: string;
+    readonly compareAt?: Prisma.Decimal | null;
 }

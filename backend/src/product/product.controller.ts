@@ -22,7 +22,9 @@ import {
     FilterProductDto,
     ProductImageDto,
     ProductVariantDto,
-    UpdateProductDto
+    ResponseVariantDto,
+    UpdateProductDto,
+    UpdateVariantDto,
 } from './dto';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { Roles } from '../auth/user-auth/decorators';
@@ -52,7 +54,7 @@ export class ProductController {
     }
 
     @Get(':id/variants')
-    async getProductVariants(@Param('id') id: string) {
+    async getProductVariants(@Param('id') id: string): Promise<ResponseVariantDto[]> {
         return this.productVariantService.getVariantsByProductId(id);
     }
 
@@ -104,7 +106,7 @@ export class ProductController {
     async addVariant(
         @Param('id') id: string,
         @Body() variantDto: ProductVariantDto
-    ) {
+    ): Promise<ResponseVariantDto> {
         return this.productVariantService.create(id, variantDto);
     }
 
@@ -126,8 +128,8 @@ export class ProductController {
     async updateVariant(
         @Param('id') id: string,
         @Param('variantId') variantId: string,
-        @Body() variantDto: Partial<ProductVariantDto>,
-    ) {
+        @Body() variantDto: UpdateVariantDto,
+    ): Promise<ResponseVariantDto> {
         return this.productVariantService.update(id, variantId, variantDto);
     }
 

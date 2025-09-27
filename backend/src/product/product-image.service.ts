@@ -114,8 +114,6 @@ export class ProductImageService {
         this.logger.debug(`Fetching all images for product ID: ${productId}`, ProductImageService.name);
         return tx.productImage.findMany({
             where: { productId },
-            include: { product: true }
-
         });
     }
 
@@ -126,7 +124,7 @@ export class ProductImageService {
             select: {
                 id: true,
                 url: true,
-                productId: true
+                productId: true,
             }
         });
 
