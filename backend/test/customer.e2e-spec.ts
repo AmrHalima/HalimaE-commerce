@@ -1,9 +1,10 @@
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, LoggerService } from '@nestjs/common';
 import request from 'supertest';
 import { setupE2ETest, teardownE2ETest } from './jest-e2e.setup';
 import * as argon2 from 'argon2';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { CreateAddressDto } from '../src/customer/dto';
+import { LogService } from '../src/logger/log.service';
 
 describe('CustomerController (e2e)', () => {
     let app: INestApplication;
@@ -11,9 +12,11 @@ describe('CustomerController (e2e)', () => {
     let adminToken: string;
     let customerToken: string;
     let addressId: string;
+    let logger: LoggerService;
 
     beforeAll(async () => {
         ({ app, prisma } = await setupE2ETest());
+        logger = app.get<LoggerService>(LogService);
 
         // 1. Create Roles
         let role = await prisma.role.findFirst({
@@ -62,12 +65,12 @@ describe('CustomerController (e2e)', () => {
                     password: 'password',
                     phone: '1234567890'
                 });
+            logger.debug?.(`Response: ${JSON.stringify(response.body)}`, 'CustomerAuthController');
 
             expect(response.status).toBe(201);
-            expect(response.body.customer).toHaveProperty('id');
-            expect(response.body.customer.name).toBe('Customer test');
-            expect(response.body.customer.email).toBe('customer@test.com');
-            expect(response.body.customer.phone).toBe('1234567890');
+            expect(response.body.name).toBe('Customer test');
+            expect(response.body.email).toBe('customer@test.com');
+            expect(response.body.phone).toBe('1234567890');
             expect(response.body).toHaveProperty('access_token');
             customerToken = response.body.access_token;
         });

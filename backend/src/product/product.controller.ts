@@ -22,7 +22,10 @@ import {
     FilterProductDto,
     ProductImageDto,
     ProductVariantDto,
-    UpdateProductDto
+    ResponseProductDto,
+    ResponseVariantDto,
+    UpdateProductDto,
+    UpdateVariantDto,
 } from './dto';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { Roles } from '../auth/user-auth/decorators';
@@ -47,12 +50,12 @@ export class ProductController {
     }
 
     @Get(':id')
-    async getProductById(@Param('id') id: string) {
+    async getProductById(@Param('id') id: string): Promise<ResponseProductDto> {
         return this.productService.findById(id);
     }
 
     @Get(':id/variants')
-    async getProductVariants(@Param('id') id: string) {
+    async getProductVariants(@Param('id') id: string): Promise<ResponseVariantDto[]> {
         return this.productVariantService.getVariantsByProductId(id);
     }
 
@@ -69,7 +72,7 @@ export class ProductController {
     @HttpCode(HttpStatus.CREATED)
     async createProduct(
         @Body() productDto: CreateProductDto,
-    ) {
+    ): Promise<ResponseProductDto | null> {
         return this.productService.create(productDto);
     }
 
@@ -104,7 +107,7 @@ export class ProductController {
     async addVariant(
         @Param('id') id: string,
         @Body() variantDto: ProductVariantDto
-    ) {
+    ): Promise<ResponseVariantDto> {
         return this.productVariantService.create(id, variantDto);
     }
 
@@ -115,7 +118,7 @@ export class ProductController {
     async updateProduct(
         @Param('id') id: string,
         @Body() updateProductDto: UpdateProductDto,
-    ) {
+    ): Promise<ResponseProductDto> {
         return this.productService.update(id, updateProductDto);
     }
 
@@ -126,8 +129,8 @@ export class ProductController {
     async updateVariant(
         @Param('id') id: string,
         @Param('variantId') variantId: string,
-        @Body() variantDto: Partial<ProductVariantDto>,
-    ) {
+        @Body() variantDto: UpdateVariantDto,
+    ): Promise<ResponseVariantDto> {
         return this.productVariantService.update(id, variantId, variantDto);
     }
 
@@ -151,7 +154,7 @@ export class ProductController {
     @UseGuards(JwtUserGuard, RolesGuard)
     @HttpCode(HttpStatus.NO_CONTENT)
     async removeProduct(@Param('id') id: string) {
-        return this.productService.remove(id);
+        await this.productService.remove(id);
     }
 
 
@@ -160,7 +163,7 @@ export class ProductController {
     @UseGuards(JwtUserGuard, RolesGuard)
     @HttpCode(HttpStatus.NO_CONTENT)
     async removeVariant(@Param('id') id: string, @Param('variantId') variantId: string) {
-        return this.productVariantService.delete(id, variantId);
+        await this.productVariantService.delete(id, variantId);
     }
 
 
@@ -169,6 +172,6 @@ export class ProductController {
     @UseGuards(JwtUserGuard, RolesGuard)
     @HttpCode(HttpStatus.NO_CONTENT)
     async removeImage(@Param('id') id: string, @Param('imageId') imageId: string) {
-        return this.productImageService.delete(id, imageId);
+        await this.productImageService.delete(id, imageId);
     }
 }

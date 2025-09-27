@@ -2,7 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { PrismaService } from '../prisma/prisma.service';
 import { ProductImageDto } from './dto';
 import { Prisma } from '@prisma/client';
-import { UPLOAD_DIR, TEMP_PATH } from './config/multer.config';
+import { UPLOAD_DIR_PRODUCTS, TEMP_PATH } from './config/multer.config';
 import sharp from 'sharp';
 import { promises as fs, existsSync, rmSync, PathLike } from 'fs';
 import { basename, join } from 'path';
@@ -29,7 +29,7 @@ export class ProductImageService {
             try {
                 // 1. Process and save image to a temporary location
                 tempFileName = await this.processImage(image);
-                const finalPath = join(UPLOAD_DIR, tempFileName);
+                const finalPath = join(UPLOAD_DIR_PRODUCTS, tempFileName);
                 const tempFilePath = join(TEMP_PATH, tempFileName);
  
                 // 2. Move image from temp to final destination
@@ -68,7 +68,7 @@ export class ProductImageService {
         return createdImages[0];
     }
 
-    async delete(productId: string, id: string, tx: Prisma.TransactionClient = this.prisma) {
+    async delete(productId: string, id: string, tx: Prisma.TransactionClient = this.prisma): Promise<void> {
         this.logger.debug(`Attempting to delete image ${id} from product ${productId}`, ProductImageService.name);
         const image = await tx.productImage.findUnique({
             where: { id },
@@ -86,7 +86,7 @@ export class ProductImageService {
         }
 
         // image.url is like '/images/products/filename.ext'
-        const filePath = join(UPLOAD_DIR, basename(image.url));
+        const filePath = join(UPLOAD_DIR_PRODUCTS, basename(image.url));
 
         if (existsSync(filePath)) {
             this.logger.debug(`Deleting image file: ${filePath}`, ProductImageService.name);
@@ -97,7 +97,6 @@ export class ProductImageService {
             where: { id },
         });
         this.logger.log(`Successfully deleted image ${id} from product ${productId}`, ProductImageService.name);
-        return;
     }
 
     async metaDataupdate(id: string, productImageDto: Partial<ProductImageDto>, tx: Prisma.TransactionClient = this.prisma) {
@@ -115,8 +114,6 @@ export class ProductImageService {
         this.logger.debug(`Fetching all images for product ID: ${productId}`, ProductImageService.name);
         return tx.productImage.findMany({
             where: { productId },
-            include: { product: true }
-
         });
     }
 
@@ -127,7 +124,7 @@ export class ProductImageService {
             select: {
                 id: true,
                 url: true,
-                productId: true
+                productId: true,
             }
         });
 
@@ -142,7 +139,7 @@ export class ProductImageService {
         }
 
         // 1. Delete the old file from the filesystem
-        const oldFilePath = join(UPLOAD_DIR, basename(image.url));
+        const oldFilePath = join(UPLOAD_DIR_PRODUCTS, basename(image.url));
         this.logger.debug(`Deleting old image file: ${oldFilePath}`, ProductImageService.name);
         if (existsSync(oldFilePath)) {
             rmSync(oldFilePath);
@@ -150,7 +147,7 @@ export class ProductImageService {
 
         // 2. Process the new file buffer and save it
         const newFileName = await this.processImage(newFile);
-        const finalPath = join(UPLOAD_DIR, newFileName);
+        const finalPath = join(UPLOAD_DIR_PRODUCTS, newFileName);
         const tempFilePath = join(TEMP_PATH, newFileName);
         await fs.rename(tempFilePath, finalPath);
 

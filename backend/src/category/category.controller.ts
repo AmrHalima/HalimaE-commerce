@@ -13,6 +13,8 @@ import {
 } from '@nestjs/common';
 import {
     CreateCategoryDto,
+    ResponseCategoriesFilteredDto,
+    ResponseCategoryDto,
     UpdateCategoryDto
 } from './dto';
 import { CategoryService } from './category.service';
@@ -30,7 +32,7 @@ export class CategoryController {
         @Query('orderBy') orderBy?: string,
         @Query('orderDirection') orderDirection?: string,
         @Query('search') search?: string
-    ) {
+    ): Promise<ResponseCategoriesFilteredDto> {
         return this.categoryService.getAllPagenated(
             page,
             limit,
@@ -41,12 +43,12 @@ export class CategoryController {
     }
 
     @Get(':id')
-    getCategoryById(@Param('id') id: string) {
+    getCategoryById(@Param('id') id: string): Promise<ResponseCategoryDto> {
         return this.categoryService.getById(id);
     }
     
     @Get('slug/:slug')
-    getCategoryBySlug(@Param('slug') slug: string) {
+    getCategoryBySlug(@Param('slug') slug: string): Promise<ResponseCategoryDto> {
         return this.categoryService.getBySlug(slug);
     }
     
@@ -54,7 +56,7 @@ export class CategoryController {
     @UseGuards(JwtUserGuard, RolesGuard)
     @Post()
     @HttpCode(HttpStatus.CREATED)
-    createCategory(@Body() createCategoryDto: CreateCategoryDto) {
+    createCategory(@Body() createCategoryDto: CreateCategoryDto): Promise<ResponseCategoryDto> {
         return this.categoryService.create(createCategoryDto);
     }
 
@@ -62,7 +64,7 @@ export class CategoryController {
     @UseGuards(JwtUserGuard, RolesGuard)
     @Patch(':id')
     @HttpCode(HttpStatus.OK)
-    updateCategory(@Param('id') id: string, @Body() updateCategoryDto: UpdateCategoryDto) {
+    updateCategory(@Param('id') id: string, @Body() updateCategoryDto: UpdateCategoryDto): Promise<ResponseCategoryDto> {
         return this.categoryService.update(id, updateCategoryDto);
     }
 

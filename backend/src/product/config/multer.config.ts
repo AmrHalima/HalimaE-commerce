@@ -5,9 +5,9 @@ import * as fs from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'crypto';
 
-export const UPLOAD_DIR = join(process.cwd(), 'public', 'uploads', 'images', 'products');
+export const UPLOAD_DIR_PRODUCTS = join(process.cwd(), 'public', 'uploads', 'products');
 
-export const TEMP_PATH = join(UPLOAD_DIR, 'temp');
+export const TEMP_PATH = join(UPLOAD_DIR_PRODUCTS, 'temp');
 if (!fs.existsSync(TEMP_PATH)) {
     fs.mkdirSync(TEMP_PATH, { recursive: true });
 }
@@ -26,10 +26,10 @@ export const multerOptions: MulterOptions = {
     storage: diskStorage({
         destination: (req, file, cb) => {
             // Ensure the upload directory exists
-            if (!fs.existsSync(UPLOAD_DIR)) {
-                fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+            if (!fs.existsSync(UPLOAD_DIR_PRODUCTS)) {
+                fs.mkdirSync(UPLOAD_DIR_PRODUCTS, { recursive: true });
             }
-            cb(null, UPLOAD_DIR);
+            cb(null, UPLOAD_DIR_PRODUCTS);
         },
         filename: (req, file, cb) => {
             const uniqueSuffix = randomUUID();

@@ -24,9 +24,9 @@ async function bootstrap() {
     transform: true,
     transformOptions: { enableImplicitConversion: true },
   }));
-
-  app.useStaticAssets(join(__dirname, '..', 'public'), {
-    prefix: '/public/',
+  
+  app.useStaticAssets(join(__dirname, '..', 'public', 'uploads'), {
+        prefix: '/images/',
   });
   
   app.setGlobalPrefix('/api');

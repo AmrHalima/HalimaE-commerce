@@ -1,10 +1,9 @@
 import { Injectable, ConflictException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
-import { CreateUserDto, LoginUserDto } from '../../users/dto';
+import { CreateUserDto, LoginUserDto, UserResponseDto } from '../../users/dto';
 import { UsersService } from '../../users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
 import { LogService } from '../../logger/log.service';
-
 
 @Injectable()
 export class UserAuthService {
@@ -16,10 +15,6 @@ export class UserAuthService {
 
     async signup(dto: CreateUserDto) {
         this.logger.debug(`Attempting to sign up user with email: ${dto.email}`, UserAuthService.name);
-        if (await this.userService.findByEmail(dto.email)) {
-            this.logger.warn(`Signup failed. User already exists: ${dto.email}`, UserAuthService.name);
-            throw new ConflictException("user already exists");
-        }
         const user = await this.userService.create(dto);
         this.logger.log(`User created successfully: ${user.email} (ID: ${user.id})`, UserAuthService.name);
         return this.login({
@@ -28,7 +23,7 @@ export class UserAuthService {
         });
     }
 
-    async login(dto: LoginUserDto) {
+    async login(dto: LoginUserDto): Promise<UserResponseDto> {
         this.logger.debug(`Attempting to log in user: ${dto.email}`, UserAuthService.name);
         const user = await this.userService.findByEmail(dto.email);
         if (!user) {
@@ -49,9 +44,10 @@ export class UserAuthService {
             role: user.role?.name
         }
 
-        const { passwordHash, provider, providerId, ...userWithoutPassword } = user;
         return {
-            user: userWithoutPassword,
+            name: user.name,
+            email: user.email,
+            role: user.role,
             access_token: await this.jwtService.signAsync(payload)
         }
     }

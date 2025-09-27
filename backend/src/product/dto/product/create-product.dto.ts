@@ -16,7 +16,7 @@ export class CreateProductDto {
 
     @IsString()
     @IsOptional()
-    public description?: string;
+    public description?: string | null;
 
     @IsString()
     public slug: string;

@@ -1,11 +1,12 @@
-import { 
-    ArrayNotEmpty,
-    IsArray,
+import {
     IsEmail,
+    IsEnum,
     IsOptional,
     IsString,
+    IsUUID,
     Length,
 } from "class-validator";
+import { PROVIDER } from "@prisma/client";
 
 export class CreateUserDto {
     @IsString()
@@ -26,10 +27,11 @@ export class CreateUserDto {
     readonly provider?: string;
 
     @IsOptional()
-    @IsString()
-    readonly providerId?: string;
+    @IsEnum(PROVIDER)
+    readonly providerId?: PROVIDER = 'LOCAL';
 
     @IsOptional()
     @IsString()
+    @IsUUID()
     readonly roleId: string;
 }
