@@ -22,6 +22,7 @@ import {
     FilterProductDto,
     ProductImageDto,
     ProductVariantDto,
+    ResponseProductDto,
     ResponseVariantDto,
     UpdateProductDto,
     UpdateVariantDto,
@@ -49,7 +50,7 @@ export class ProductController {
     }
 
     @Get(':id')
-    async getProductById(@Param('id') id: string) {
+    async getProductById(@Param('id') id: string): Promise<ResponseProductDto> {
         return this.productService.findById(id);
     }
 
@@ -71,7 +72,7 @@ export class ProductController {
     @HttpCode(HttpStatus.CREATED)
     async createProduct(
         @Body() productDto: CreateProductDto,
-    ) {
+    ): Promise<ResponseProductDto | null> {
         return this.productService.create(productDto);
     }
 
@@ -117,7 +118,7 @@ export class ProductController {
     async updateProduct(
         @Param('id') id: string,
         @Body() updateProductDto: UpdateProductDto,
-    ) {
+    ): Promise<ResponseProductDto> {
         return this.productService.update(id, updateProductDto);
     }
 

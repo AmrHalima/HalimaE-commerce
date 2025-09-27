@@ -120,7 +120,7 @@ export class ProductService {
         return product;
     }
 
-    async create(createProductDto: CreateProductDto) {
+    async create(createProductDto: CreateProductDto): Promise<ResponseProductDto | null> {
         this.logger.debug(`Attempting to create product with DTO: ${JSON.stringify(createProductDto)}`, ProductService.name);
         try {
             const newProduct = await this.prisma.$transaction(async (tx) => {
