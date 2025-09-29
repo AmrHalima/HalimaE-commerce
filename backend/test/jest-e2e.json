@@ -5,5 +5,9 @@
   "testRegex": ".e2e-spec.ts$",
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
-  }
+  },
+  "maxWorkers": 1,
+  "runInBand": true,
+  "forceExit": true,
+  "detectOpenHandles": true
 }
