@@ -436,7 +436,7 @@ describe('CartController (e2e)', () => {
             const variant2 = await prisma.productVariant.create({
                 data: {
                     productId: productId,
-                    sku: 'TEST-SKU-002',
+                    sku: getUniqueTestData('sku'),
                     size: 'L',
                     color: 'Red',
                     material: 'Cotton',
