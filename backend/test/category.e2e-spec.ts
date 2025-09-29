@@ -5,6 +5,11 @@ import { CreateUserDto } from '../src/users/dto';
 import { UsersService } from '../src/users/users.service';
 import { setupE2ETest, teardownE2ETest } from './jest-e2e.setup';
 import { LogService } from '../src/logger/log.service';
+import { 
+    expectSuccessResponse, 
+    expectErrorResponse, 
+    extractAuthTokenFromResponse
+} from './test-utils';
 
 describe('CategoryController (e2e)', () => {
     let app: INestApplication;
@@ -40,7 +45,7 @@ describe('CategoryController (e2e)', () => {
         const adminLoginRes = await request(app.getHttpServer())
             .post('/api/admin/auth/login')
             .send({ email: adminDto.email, password: adminDto.password });
-        adminToken = adminLoginRes.body.access_token;
+        adminToken = extractAuthTokenFromResponse(adminLoginRes);
 
         // 4. Use the admin token to create an employee user via the signup endpoint
         const employeeDto: CreateUserDto = { name: 'Test Employee', email: 'employee-cat@test.com', password: 'password123', roleId: employeeRoleId };
@@ -57,7 +62,7 @@ describe('CategoryController (e2e)', () => {
         const employeeLoginRes = await request(app.getHttpServer())
             .post('/api/admin/auth/login')
             .send({ email: employeeDto.email, password: employeeDto.password });
-        employeeToken = employeeLoginRes.body.access_token;
+        employeeToken = extractAuthTokenFromResponse(employeeLoginRes);
     }, 30000); // Set timeout to 30 seconds for setup
 
     afterAll(async () => {
@@ -69,7 +74,10 @@ describe('CategoryController (e2e)', () => {
         return request(app.getHttpServer())
             .post('/api/categories')
             .send({ name: "Women's Clothing", slug: 'womens-clothing' })
-            .expect(401);
+            .expect(401)
+            .expect(res => {
+                expectErrorResponse(res, 401);
+            });
         });
 
         it('should create a new top-level category for an admin user', async () => {
@@ -80,9 +88,10 @@ describe('CategoryController (e2e)', () => {
                 .send(dto)
                 .expect(201);
 
-            expect(response.body).toMatchObject(dto);
-            expect(response.body.id).toBeDefined();
-            categoryIds.push(response.body.id);
+            const data = expectSuccessResponse<any>(response, 201);
+            expect(data).toMatchObject(dto);
+            expect(data.id).toBeDefined();
+            categoryIds.push(data.id);
         });
 
         it('should create a new sub-category for an employee user', async () => {
@@ -98,9 +107,10 @@ describe('CategoryController (e2e)', () => {
                 .send(dto)
                 .expect(201);
     
-            expect(response.body).toMatchObject({ name: 'Dresses', slug: 'dresses' });
-            expect(response.body.id).toBeDefined();
-            categoryIds.push(response.body.id);
+            const data = expectSuccessResponse<any>(response, 201);
+            expect(data).toMatchObject({ name: 'Dresses', slug: 'dresses' });
+            expect(data.id).toBeDefined();
+            categoryIds.push(data.id);
         });
     });
 
@@ -112,9 +122,10 @@ describe('CategoryController (e2e)', () => {
 
             logger.debug?.(`Response body: ${JSON.stringify(response.body, null, 2)}`, '/categories (GET)');
 
-            expect(Array.isArray(response.body.categories)).toBe(true);
-            expect(response.body.categories.length).toBeGreaterThanOrEqual(2);
-            expect(response.body.categories.find((c: any) => c.slug === 'womens-clothing')).toBeDefined();
+            const data = expectSuccessResponse<any>(response, 200);
+            expect(Array.isArray(data.categories)).toBe(true);
+            expect(data.categories.length).toBeGreaterThanOrEqual(2);
+            expect(data.categories.find((c: any) => c.slug === 'womens-clothing')).toBeDefined();
         });
     });
 
@@ -126,14 +137,18 @@ describe('CategoryController (e2e)', () => {
                 .get(`/api/categories/${womensCategory!.id}`)
                 .expect(200);
 
-            expect(response.body.id).toBe(womensCategory!.id);
-            expect(response.body.name).toBe("Women's Clothing");
+            const data = expectSuccessResponse<any>(response, 200);
+            expect(data.id).toBe(womensCategory!.id);
+            expect(data.name).toBe("Women's Clothing");
         });
 
         it('should return 404 for a non-existent category ID', () => {
             return request(app.getHttpServer())
                 .get('/api/categories/00000000-0000-0000-0000-000000000000')
-                .expect(404);
+                .expect(404)
+                .expect(res => {
+                    expectErrorResponse(res, 404);
+                });
         });
     });
 
@@ -143,8 +158,9 @@ describe('CategoryController (e2e)', () => {
                 .get('/api/categories/slug/dresses')
                 .expect(200);
 
-            expect(response.body.slug).toBe('dresses');
-            expect(response.body.name).toBe('Dresses');
+            const data = expectSuccessResponse<any>(response, 200);
+            expect(data.slug).toBe('dresses');
+            expect(data.name).toBe('Dresses');
         });
     });
 
@@ -159,8 +175,9 @@ describe('CategoryController (e2e)', () => {
                 .send(dto)
                 .expect(200);
 
-            expect(response.body.name).toBe('Summer Dresses');
-            expect(response.body.slug).toBe('dresses'); // slug was not updated
+            const data = expectSuccessResponse<any>(response, 200);
+            expect(data.name).toBe('Summer Dresses');
+            expect(data.slug).toBe('dresses'); // slug was not updated
         });
     });
 
@@ -171,7 +188,10 @@ describe('CategoryController (e2e)', () => {
             return request(app.getHttpServer())
                 .delete(`/api/categories/${womensCategory!.id}`)
                 .set('Authorization', `Bearer ${employeeToken}`)
-                .expect(403); // Forbidden, as only admin can delete
+                .expect(403) // Forbidden, as only admin can delete
+                .expect(res => {
+                    expectErrorResponse(res, 403);
+                });
         });
         
         it('shouldn not delete a parent category that has children', async () => {
@@ -180,7 +200,10 @@ describe('CategoryController (e2e)', () => {
             await request(app.getHttpServer())
                 .delete(`/api/categories/${womensCategory!.id}`)
                 .set('Authorization', `Bearer ${adminToken}`)
-                .expect(400);
+                .expect(400)
+                .expect(res => {
+                    expectErrorResponse(res, 400);
+                });
         });
         
         it('should delete a category for an admin user', async () =>{
@@ -201,7 +224,10 @@ describe('CategoryController (e2e)', () => {
             return request(app.getHttpServer())
                 .delete('/api/categories/00000000-0000-0000-0000-000000000000')
                 .set('Authorization', `Bearer ${adminToken}`)
-                .expect(404);
+                .expect(404)
+                .expect(res => {
+                    expectErrorResponse(res, 404);
+                });
         });
     });
 });

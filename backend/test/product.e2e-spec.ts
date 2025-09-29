@@ -2,13 +2,22 @@ import { INestApplication, LoggerService, Logger } from '@nestjs/common';
 import request from 'supertest';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { CreateProductDto, ProductVariantDto } from '../src/product/dto';
-import { Status } from '@prisma/client';
+import { Status, Prisma } from '@prisma/client';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as argon2 from 'argon2';
 import { setupE2ETest, teardownE2ETest } from './jest-e2e.setup';
 import { LogService } from '../src/logger/log.service';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { 
+    expectSuccessResponse, 
+    expectErrorResponse, 
+    expectSuccessArrayResponse,
+    expectSuccessPaginatedResponse,
+    extractAuthTokenFromResponse,
+    expectHttpStatus,
+    expectSuccessMessage
+} from './test-utils';
 
 describe('ProductController (e2e)', () => {
     let app: NestExpressApplication;
@@ -59,7 +68,7 @@ describe('ProductController (e2e)', () => {
             .post('/api/admin/auth/login')
             .send({ email: user.email, password: 'password' });
 
-        authToken = loginResponse.body.access_token;
+        authToken = extractAuthTokenFromResponse(loginResponse);
 
         // 3. Create a test category
         const category = await prisma.category.upsert({
@@ -83,7 +92,10 @@ describe('ProductController (e2e)', () => {
         it('should fail with 401 if not authenticated', () => {
             return request(app.getHttpServer())
                 .post('/api/products')
-                .expect(401);
+                .expect(401)
+                .expect(res => {
+                    expectErrorResponse(res, 401);
+                });
         });
 
         it('should create a new product, then add images to it', async () => {
@@ -92,7 +104,7 @@ describe('ProductController (e2e)', () => {
                 sku: 'E2E-TSHIRT-RED-L',
                 size: 'L',
                 color: 'Red',
-                prices: [{ currency: 'USD', amount: "25.99" }],
+                prices: [{ currency: 'USD', amount: new Prisma.Decimal('25.99') }],
                 inventory: { stockOnHand: 100 },
                 isActive: true,
                 material: 'Cotton'
@@ -117,14 +129,15 @@ describe('ProductController (e2e)', () => {
             logger.log(`Create Response: ${JSON.stringify(createResponse.body)}`, 'E2E-Product');
 
             expect(createResponse.status).toBe(201);
-            expect(createResponse.body).toHaveProperty('id');
-            expect(createResponse.body.name).toBe(createDto.name);
-            expect(createResponse.body.variants).toHaveLength(1);
-            expect(createResponse.body.images).toHaveLength(0); // No images yet
+            const productData = expectSuccessResponse<any>(createResponse, 201);
+            expect(productData).toHaveProperty('id');
+            expect(productData.name).toBe(createDto.name);
+            expect(productData.variants).toHaveLength(1);
+            expect(productData.images).toHaveLength(0); // No images yet
 
             // Save IDs for subsequent tests
-            productId = createResponse.body.id;
-            variantId = createResponse.body.variants[0].id;
+            productId = productData.id;
+            variantId = productData.variants[0].id;
 
             // Step 2: Upload an image for the created product
             const imagesMeta = [{ alt: 'A test t-shirt', sort: 1 }];
@@ -138,15 +151,15 @@ describe('ProductController (e2e)', () => {
             logger.log(`Add Image Response: ${JSON.stringify(addImageResponse.body)}`, 'E2E-Product');
 
             expect(addImageResponse.status).toBe(201);
-            expect(addImageResponse.body).toBeInstanceOf(Array);
-            expect(addImageResponse.body).toHaveLength(1);
-            expect(addImageResponse.body[0]).toHaveProperty('id');
-            expect(addImageResponse.body[0].alt).toBe(imagesMeta[0].alt);
+            const imageData = expectSuccessArrayResponse<any>(addImageResponse, 201);
+            expect(imageData).toHaveLength(1);
+            expect(imageData[0]).toHaveProperty('id');
+            expect(imageData[0].alt).toBe(imagesMeta[0].alt);
 
-            imageId = addImageResponse.body[0].id;
+            imageId = imageData[0].id;
 
             // Step 3: Verify the image can be served via its URL
-            const imageUrl = addImageResponse.body[0].url;
+            const imageUrl = imageData[0].url;
             const serveImageResponse = await request(app.getHttpServer())
                 .get(imageUrl) // The URL is relative, e.g., /images/products/....
                 .expect(200);
@@ -162,9 +175,10 @@ describe('ProductController (e2e)', () => {
                 .get('/api/products')
                 .expect(200);
 
-            expect(response.body.products).toBeInstanceOf(Array);
-            expect(response.body.products.length).toBeGreaterThan(0);
-            expect(response.body.meta).toBeDefined();
+            const data = expectSuccessResponse<any>(response, 200);
+            expect(data.products).toBeInstanceOf(Array);
+            expect(data.products.length).toBeGreaterThan(0);
+            expect(data.meta).toBeDefined();
         });
 
         it('should filter products by categoryId', async () => {
@@ -172,8 +186,9 @@ describe('ProductController (e2e)', () => {
                 .get(`/api/products?categoryId=${categoryId}`)
                 .expect(200);
 
-            expect(response.body.products).toHaveLength(1);
-            expect(response.body.products[0].name).toBe('E2E Test T-Shirt');
+            const data = expectSuccessResponse<any>(response, 200);
+            expect(data.products).toHaveLength(1);
+            expect(data.products[0].name).toBe('E2E Test T-Shirt');
         });
 
         it('should filter products by status', async () => {
@@ -181,15 +196,18 @@ describe('ProductController (e2e)', () => {
                 .get(`/api/products?status=${Status.ACTIVE}`)
                 .expect(200);
 
-            expect(response.body.products.length).toBeGreaterThan(0);
-            expect(response.body.products[0].status).toBe(Status.ACTIVE);
+            const data = expectSuccessResponse<any>(response, 200);
+            expect(data.products.length).toBeGreaterThan(0);
+            expect(data.products[0].status).toBe(Status.ACTIVE);
         });
 
         it('should filter products by price range', async () => {
             const response = await request(app.getHttpServer())
                 .get('/api/products?priceMin=20&priceMax=30')
                 .expect(200);
-            expect(response.body.products[0].name).toBe('E2E Test T-Shirt');
+            
+            const data = expectSuccessResponse<any>(response, 200);
+            expect(data.products[0].name).toBe('E2E Test T-Shirt');
         });
 
         it('should filter products by name', async () => {
@@ -197,7 +215,8 @@ describe('ProductController (e2e)', () => {
                 .get('/api/products?name=E2E Test T-Shirt')
                 .expect(200);
 
-            expect(response.body.products[0].name).toBe('E2E Test T-Shirt');
+            const data = expectSuccessResponse<any>(response, 200);
+            expect(data.products[0].name).toBe('E2E Test T-Shirt');
         });
     });
 
@@ -207,15 +226,19 @@ describe('ProductController (e2e)', () => {
                 .get(`/api/products/${productId}`)
                 .expect(200)
                 .expect(res => {
-                    expect(res.body.id).toBe(productId);
-                    expect(res.body.name).toBe('E2E Test T-Shirt');
+                    const data = expectSuccessResponse<any>(res, 200);
+                    expect(data.id).toBe(productId);
+                    expect(data.name).toBe('E2E Test T-Shirt');
                 });
         });
 
         it('should return 404 for a non-existent product ID', () => {
             return request(app.getHttpServer())
-                .get('/api/products/00000000-0000-0000-0000-000000000000') // Use a valid UUID format
-                .expect(404);
+                .get('/api/products/00000000-0000-0000-0000-000000000000')
+                .expect(404)
+                .expect(res => {
+                    expectErrorResponse(res, 404);
+                });
         });
     });
 
@@ -225,8 +248,8 @@ describe('ProductController (e2e)', () => {
                 .get(`/api/products/${productId}/variants`)
                 .expect(200)
                 .expect(res => {
-                    expect(res.body).toBeInstanceOf(Array);
-                    expect(res.body[0].id).toBe(variantId);
+                    const data = expectSuccessArrayResponse<any>(res, 200);
+                    expect(data[0].id).toBe(variantId);
                 });
         });
     });
@@ -237,8 +260,8 @@ describe('ProductController (e2e)', () => {
                 .get(`/api/products/${productId}/images`)
                 .expect(200)
                 .expect(res => {
-                    expect(res.body).toBeInstanceOf(Array);
-                    expect(res.body[0].id).toBe(imageId);
+                    const data = expectSuccessArrayResponse<any>(res, 200);
+                    expect(data[0].id).toBe(imageId);
                 });
         });
     });
@@ -251,7 +274,8 @@ describe('ProductController (e2e)', () => {
                 .send({ name: 'Updated E2E Test T-Shirt' })
                 .expect(200)
                 .expect(res => {
-                    expect(res.body.name).toBe('Updated E2E Test T-Shirt');
+                    const data = expectSuccessResponse<any>(res, 200);
+                    expect(data.name).toBe('Updated E2E Test T-Shirt');
                 });
         });
     });
@@ -262,7 +286,7 @@ describe('ProductController (e2e)', () => {
                 sku: 'E2E-TSHIRT-BLUE-M',
                 color: 'Blue',
                 size: 'M',
-                prices: [{ currency: 'USD', amount: "24.99" }],
+                prices: [{ currency: 'USD', amount: new Prisma.Decimal('24.99') }],
             };
 
             const response = await request(app.getHttpServer())
@@ -271,7 +295,8 @@ describe('ProductController (e2e)', () => {
                 .send(newVariant)
                 .expect(201);
 
-            expect(response.body.sku).toBe(newVariant.sku);
+            const data = expectSuccessResponse<any>(response, 201);
+            expect(data.sku).toBe(newVariant.sku);
         });
     });
 
@@ -283,7 +308,8 @@ describe('ProductController (e2e)', () => {
                 .send({ sku: 'E2E-TSHIRT-RED-L-UPDATED' })
                 .expect(200)
                 .expect(res => {
-                    expect(res.body.sku).toBe('E2E-TSHIRT-RED-L-UPDATED');
+                    const data = expectSuccessResponse<any>(res, 200);
+                    expect(data.sku).toBe('E2E-TSHIRT-RED-L-UPDATED');
                 });
         });
     });
@@ -298,8 +324,9 @@ describe('ProductController (e2e)', () => {
                 .attach('image', testImagePath)
                 .expect(200);
 
+            const data = expectSuccessResponse<any>(response, 200);
             // The URL should be different from the original one
-            expect(response.body.url).not.toBe(originalImage?.url);
+            expect(data.url).not.toBe(originalImage?.url);
         });
     });
 

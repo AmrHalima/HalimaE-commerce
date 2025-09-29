@@ -7,6 +7,9 @@ import { join } from 'path';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { LogService } from '../src/logger/log.service';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { Reflector } from '@nestjs/core';
+import { ResponseInterceptor } from '../common/interceptors/response.interceptor';
+import { GlobalExceptionFilter } from '../common/filters/global-exception.filter';
 
 // Global counter for unique test data
 let testCounter = 0;
@@ -61,12 +64,22 @@ export async function setupE2ETest() {
     .compile()
 
     const app = moduleFixture.createNestApplication<NestExpressApplication>();
+    
+    const logService = app.get(LogService);
+    app.useLogger(logService);
+    
+    // Apply the same global configurations as in main.ts
+    app.useGlobalFilters(new GlobalExceptionFilter(logService));
+    
+    const reflector = app.get(Reflector);
+    app.useGlobalInterceptors(new ResponseInterceptor(reflector));
+    
     app.useGlobalPipes(new ValidationPipe({
         whitelist: true,
         transform: true,
         transformOptions: { enableImplicitConversion: true },
     }));
-    app.useLogger(app.get<LoggerService>(LogService));
+    
     // This is the key change. It maps the physical directory where images are stored
     // to the URL path that the ProductImageService generates.
     app.useStaticAssets(join(__dirname, '..', 'public', 'uploads'), {
