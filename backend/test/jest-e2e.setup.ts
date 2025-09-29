@@ -8,21 +8,40 @@ import { ThrottlerGuard } from '@nestjs/throttler';
 import { LogService } from '../src/logger/log.service';
 import { NestExpressApplication } from '@nestjs/platform-express';
 
+// Global counter for unique test data
+let testCounter = 0;
+
+export function getUniqueTestData(prefix: string = 'test') {
+    const timestamp = Date.now();
+    const counter = ++testCounter;
+    return {
+        email: `${prefix}-${counter}-${timestamp}@test.com`,
+        slug: `${prefix}-${counter}-${timestamp}`,
+        name: `${prefix} ${counter} ${timestamp}`,
+        sku: `${prefix.toUpperCase()}-SKU-${counter}-${timestamp}`,
+    };
+}
+
 async function cleanDatabase(prisma: PrismaService) {
-    // Delete in order of dependency
-    await prisma.variantPrice.deleteMany();
-    await prisma.variantInventory.deleteMany();
-    await prisma.productVariant.deleteMany();
-    await prisma.productImage.deleteMany();
-    await prisma.product.deleteMany();
-    await prisma.category.deleteMany();
-    await prisma.user.deleteMany();
-    await prisma.role.deleteMany();
-    // Assuming these models exist based on schema comments
-    await prisma.address.deleteMany();
-    // await prisma.cart.deleteMany();
-    // await prisma.order.deleteMany();
-    await prisma.customer.deleteMany();
+    // Delete in order of dependency - more comprehensive cleanup
+    await prisma.orderItem.deleteMany().catch(() => {});
+    await prisma.payment.deleteMany().catch(() => {});
+    await prisma.shipment.deleteMany().catch(() => {});
+    await prisma.order.deleteMany().catch(() => {});
+    await prisma.cartItem.deleteMany().catch(() => {});
+    await prisma.cart.deleteMany().catch(() => {});
+    await prisma.variantPrice.deleteMany().catch(() => {});
+    await prisma.variantInventory.deleteMany().catch(() => {});
+    await prisma.productVariant.deleteMany().catch(() => {});
+    await prisma.productImage.deleteMany().catch(() => {});
+    await prisma.collectionProduct.deleteMany().catch(() => {});
+    await prisma.product.deleteMany().catch(() => {});
+    await prisma.collection.deleteMany().catch(() => {});
+    await prisma.category.deleteMany().catch(() => {});
+    await prisma.address.deleteMany().catch(() => {});
+    await prisma.customer.deleteMany().catch(() => {});
+    await prisma.user.deleteMany().catch(() => {});
+    await prisma.role.deleteMany().catch(() => {});
 }
 
 export async function setupE2ETest() {

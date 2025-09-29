@@ -8,6 +8,7 @@ import { CategoryModule } from './category/category.module';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { CustomerModule } from './customer/customer.module';
 import { LogModule } from './logger/log.module';
+import { CartModule } from './cart/cart.module';
 
 @Module({
     imports: [
@@ -28,6 +29,7 @@ import { LogModule } from './logger/log.module';
         }),
         CustomerModule,
         LogModule,
+        CartModule,
     ],
     providers: [
         {
