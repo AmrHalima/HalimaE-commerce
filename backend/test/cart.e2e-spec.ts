@@ -5,6 +5,11 @@ import * as argon2 from 'argon2';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { LogService } from '../src/logger/log.service';
 import { Status } from '@prisma/client';
+import { 
+    expectSuccessResponse, 
+    expectErrorResponse, 
+    extractAuthTokenFromResponse 
+} from './test-utils';
 
 describe('CartController (e2e)', () => {
     let app: INestApplication;
@@ -44,8 +49,7 @@ describe('CartController (e2e)', () => {
             .post('/api/customers/auth/login')
             .send({ email: testData.email, password: 'password' });
 
-        customerToken = loginResponse.body.access_token;
-        expect(customerToken).toBeDefined();
+        customerToken = extractAuthTokenFromResponse(loginResponse);
 
         // Create test category
         categoryData = getUniqueTestData('category');
@@ -128,11 +132,12 @@ describe('CartController (e2e)', () => {
                 });
 
             expect(response.status).toBe(201);
-            expect(response.body).toHaveProperty('id');
-            expect(response.body.qty).toBe(2);
-            expect(response.body.variantId).toBe(variantId);
+            const data = expectSuccessResponse<any>(response, 201);
+            expect(data).toHaveProperty('id');
+            expect(data.qty).toBe(2);
+            expect(data.variantId).toBe(variantId);
 
-            cartItemId = response.body.id;
+            cartItemId = data.id;
         });
 
         it('should update quantity if item already exists in cart', async () => {
@@ -145,7 +150,8 @@ describe('CartController (e2e)', () => {
                 });
 
             expect(response.status).toBe(201);
-            expect(response.body.qty).toBe(3); // 2 + 1
+            const data = expectSuccessResponse<any>(response, 201);
+            expect(data.qty).toBe(3); // 2 + 1
         });
 
         it('should return 400 for invalid data', async () => {
@@ -158,6 +164,7 @@ describe('CartController (e2e)', () => {
                 });
 
             expect(response.status).toBe(400);
+            expectErrorResponse(response, 400);
         });
 
         it('should return 401 if not authenticated', async () => {
@@ -169,6 +176,7 @@ describe('CartController (e2e)', () => {
                 });
 
             expect(response.status).toBe(401);
+            expectErrorResponse(response, 401);
         });
     });
 
@@ -179,13 +187,14 @@ describe('CartController (e2e)', () => {
                 .set('Authorization', `Bearer ${customerToken}`);
 
             expect(response.status).toBe(200);
-            expect(response.body).toHaveProperty('id');
-            expect(response.body).toHaveProperty('customerId', customerId);
-            expect(response.body).toHaveProperty('items');
-            expect(response.body).toHaveProperty('totalItems', 3);
-            expect(response.body.items).toHaveLength(1);
+            const data = expectSuccessResponse<any>(response, 200);
+            expect(data).toHaveProperty('id');
+            expect(data).toHaveProperty('customerId', customerId);
+            expect(data).toHaveProperty('items');
+            expect(data).toHaveProperty('totalItems', 3);
+            expect(data.items).toHaveLength(1);
 
-            const item = response.body.items[0];
+            const item = data.items[0];
             expect(item).toHaveProperty('id');
             expect(item).toHaveProperty('qty', 3);
             expect(item.variant).toHaveProperty('id', variantId);
@@ -214,21 +223,21 @@ describe('CartController (e2e)', () => {
                 .post('/api/customers/auth/login')
                 .send({ email: noCartData.email, password: 'password' });
 
-            const newCustomerToken = loginResponse.body.access_token;
+            const newCustomerToken = extractAuthTokenFromResponse(loginResponse);
 
             const response = await request(app.getHttpServer())
                 .get('/api/cart')
                 .set('Authorization', `Bearer ${newCustomerToken}`);
 
-            expect(response.status).toBe(404);
-            expect(response.body.message).toBe('Cart not found');
+            const error = expectErrorResponse(response, 404);
+            expect(error.message).toBe('Cart not found');
         });
 
         it('should return 401 if not authenticated', async () => {
             const response = await request(app.getHttpServer())
                 .get('/api/cart');
 
-            expect(response.status).toBe(401);
+            expectErrorResponse(response, 401);
         });
     });
 
@@ -238,13 +247,13 @@ describe('CartController (e2e)', () => {
                 .get('/api/cart/checkout')
                 .set('Authorization', `Bearer ${customerToken}`);
 
-            expect(response.status).toBe(200);
-            expect(response.body).toHaveProperty('id');
-            expect(response.body).toHaveProperty('customerId', customerId);
-            expect(response.body).toHaveProperty('items');
-            expect(response.body).toHaveProperty('totalItems', 3);
+            const data = expectSuccessResponse<any>(response, 200);
+            expect(data).toHaveProperty('id');
+            expect(data).toHaveProperty('customerId', customerId);
+            expect(data).toHaveProperty('items');
+            expect(data).toHaveProperty('totalItems', 3);
 
-            const item = response.body.items[0];
+            const item = data.items[0];
             expect(item.variant).toHaveProperty('id', variantId);
             expect(item.variant).toHaveProperty('sku', variantData.sku);
             expect(item.variant.product).toHaveProperty('name', productData.name);
@@ -262,8 +271,8 @@ describe('CartController (e2e)', () => {
                 .get('/api/cart/count')
                 .set('Authorization', `Bearer ${customerToken}`);
 
-            expect(response.status).toBe(200);
-            expect(response.body).toHaveProperty('count', 3);
+            const data = expectSuccessResponse<any>(response, 200);
+            expect(data).toHaveProperty('count', 3);
         });
     });
 
@@ -273,10 +282,10 @@ describe('CartController (e2e)', () => {
                 .get('/api/cart/total')
                 .set('Authorization', `Bearer ${customerToken}`);
 
-            expect(response.status).toBe(200);
-            expect(response.body).toHaveProperty('total', 89.97); // 29.99 * 3
-            expect(response.body).toHaveProperty('currency', 'USD');
-            expect(response.body).toHaveProperty('itemCount', 3);
+            const data = expectSuccessResponse<any>(response, 200);
+            expect(data).toHaveProperty('total', 89.97); // 29.99 * 3
+            expect(data).toHaveProperty('currency', 'USD');
+            expect(data).toHaveProperty('itemCount', 3);
         });
 
         it('should calculate cart total in specified currency', async () => {
@@ -284,9 +293,9 @@ describe('CartController (e2e)', () => {
                 .get('/api/cart/total?currency=USD')
                 .set('Authorization', `Bearer ${customerToken}`);
 
-            expect(response.status).toBe(200);
-            expect(response.body).toHaveProperty('total', 89.97);
-            expect(response.body).toHaveProperty('currency', 'USD');
+            const data = expectSuccessResponse<any>(response, 200);
+            expect(data).toHaveProperty('total', 89.97);
+            expect(data).toHaveProperty('currency', 'USD');
         });
     });
 
@@ -297,8 +306,8 @@ describe('CartController (e2e)', () => {
                 .set('Authorization', `Bearer ${customerToken}`)
                 .send({ qty: 5 });
 
-            expect(response.status).toBe(200);
-            expect(response.body).toHaveProperty('qty', 5);
+            const data = expectSuccessResponse<any>(response, 200);
+            expect(data).toHaveProperty('qty', 5);
         });
 
         it('should remove item when quantity is 0', async () => {
@@ -307,15 +316,16 @@ describe('CartController (e2e)', () => {
                 .set('Authorization', `Bearer ${customerToken}`)
                 .send({ qty: 0 });
 
-            expect(response.status).toBe(200);
+            expectSuccessResponse<any>(response, 200);
 
             // Verify item is removed
             const cartResponse = await request(app.getHttpServer())
                 .get('/api/cart')
                 .set('Authorization', `Bearer ${customerToken}`);
 
-            expect(cartResponse.body.items).toHaveLength(0);
-            expect(cartResponse.body.totalItems).toBe(0);
+            const cartData = expectSuccessResponse<any>(cartResponse, 200);
+            expect(cartData.items).toHaveLength(0);
+            expect(cartData.totalItems).toBe(0);
         });
 
         it('should return 404 for non-existent item', async () => {
@@ -324,7 +334,7 @@ describe('CartController (e2e)', () => {
                 .set('Authorization', `Bearer ${customerToken}`)
                 .send({ qty: 1 });
 
-            expect(response.status).toBe(404);
+            expectErrorResponse(response, 404);
         });
 
         it('should return 400 for invalid quantity', async () => {
@@ -342,7 +352,7 @@ describe('CartController (e2e)', () => {
                 .set('Authorization', `Bearer ${customerToken}`)
                 .send({ qty: -1 });
 
-            expect(response.status).toBe(400);
+            expectErrorResponse(response, 400);
         });
     });
 
@@ -353,20 +363,22 @@ describe('CartController (e2e)', () => {
                 .get('/api/cart')
                 .set('Authorization', `Bearer ${customerToken}`);
 
-            const itemId = cartResponse.body.items[0].id;
+            const cartData = expectSuccessResponse<any>(cartResponse, 200);
+            const itemId = cartData.items[0].id;
 
             const response = await request(app.getHttpServer())
                 .delete(`/api/cart/items/${itemId}`)
                 .set('Authorization', `Bearer ${customerToken}`);
 
-            expect(response.status).toBe(200);
+            expectSuccessResponse<any>(response, 200);
 
             // Verify item is removed
             const updatedCartResponse = await request(app.getHttpServer())
                 .get('/api/cart')
                 .set('Authorization', `Bearer ${customerToken}`);
 
-            expect(updatedCartResponse.body.items).toHaveLength(0);
+            const updatedCartData = expectSuccessResponse<any>(updatedCartResponse, 200);
+            expect(updatedCartData.items).toHaveLength(0);
         });
 
         it('should return 404 for non-existent item', async () => {
@@ -374,7 +386,7 @@ describe('CartController (e2e)', () => {
                 .delete('/api/cart/items/00000000-0000-0000-0000-000000000000')
                 .set('Authorization', `Bearer ${customerToken}`);
 
-            expect(response.status).toBe(404);
+            expectErrorResponse(response, 404);
         });
     });
 
@@ -393,15 +405,16 @@ describe('CartController (e2e)', () => {
                 .delete('/api/cart')
                 .set('Authorization', `Bearer ${customerToken}`);
 
-            expect(response.status).toBe(200);
-            expect(response.body).toHaveProperty('message', 'Cart cleared successfully');
+            const data = expectSuccessResponse<any>(response, 200);
+            expect(data).toHaveProperty('message', 'Cart cleared successfully');
 
             // Verify cart is empty
             const cartResponse = await request(app.getHttpServer())
                 .get('/api/cart')
                 .set('Authorization', `Bearer ${customerToken}`);
 
-            expect(cartResponse.body.items).toHaveLength(0);
+            const cartData = expectSuccessResponse<any>(cartResponse, 200);
+            expect(cartData.items).toHaveLength(0);
         });
 
         it('should return 404 for non-existent cart', async () => {
@@ -420,13 +433,13 @@ describe('CartController (e2e)', () => {
                 .post('/api/customers/auth/login')
                 .send({ email: emptyCartData.email, password: 'password' });
 
-            const newCustomerToken = loginResponse.body.access_token;
+            const newCustomerToken = extractAuthTokenFromResponse(loginResponse);
 
             const response = await request(app.getHttpServer())
                 .delete('/api/cart')
                 .set('Authorization', `Bearer ${newCustomerToken}`);
 
-            expect(response.status).toBe(404);
+            expectErrorResponse(response, 404);
         });
     });
 
@@ -436,7 +449,7 @@ describe('CartController (e2e)', () => {
             const variant2 = await prisma.productVariant.create({
                 data: {
                     productId: productId,
-                    sku: getUniqueTestData('sku'),
+                    sku: getUniqueTestData('sku').sku,
                     size: 'L',
                     color: 'Red',
                     material: 'Cotton',
@@ -473,16 +486,17 @@ describe('CartController (e2e)', () => {
                 .get('/api/cart')
                 .set('Authorization', `Bearer ${customerToken}`);
 
-            expect(response.status).toBe(200);
-            expect(response.body.items).toHaveLength(2);
-            expect(response.body.totalItems).toBe(3); // 2 + 1
+            const data = expectSuccessResponse<any>(response, 200);
+            expect(data.items).toHaveLength(2);
+            expect(data.totalItems).toBe(3); // 2 + 1
 
             // Check total calculation
             const totalResponse = await request(app.getHttpServer())
                 .get('/api/cart/total')
                 .set('Authorization', `Bearer ${customerToken}`);
 
-            expect(totalResponse.body.total).toBe(94.97); // (29.99 * 2) + (34.99 * 1)
+            const totalData = expectSuccessResponse<any>(totalResponse, 200);
+            expect(totalData.total).toBe(94.97); // (29.99 * 2) + (34.99 * 1)
         });
 
         it('should handle concurrent cart operations', async () => {
@@ -506,20 +520,20 @@ describe('CartController (e2e)', () => {
             
             // Check that all requests succeeded
             results.forEach(result => {
-                expect(result.status).toBe(201);
+                expectSuccessResponse<any>(result, 201);
             });
 
             const response = await request(app.getHttpServer())
                 .get('/api/cart')
                 .set('Authorization', `Bearer ${customerToken}`);
 
-            expect(response.status).toBe(200);
+            const data = expectSuccessResponse<any>(response, 200);
             
             // With proper transactions, all 5 additions should accumulate into a single item
             // The total quantity should be 5, regardless of how many cart items exist
-            const totalQuantity = response.body.items.reduce((sum: number, item: any) => sum + item.qty, 0);
+            const totalQuantity = data.items.reduce((sum: number, item: any) => sum + item.qty, 0);
             expect(totalQuantity).toBe(5);
-            expect(response.body.totalItems).toBe(5);
+            expect(data.totalItems).toBe(5);
         });
     });
 });
