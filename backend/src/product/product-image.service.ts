@@ -46,7 +46,6 @@ export class ProductImageService {
                     },
                 });
             } catch (error) {
-                // If anything fails, attempt to clean up the created temp file
                 if (tempFileName) {
                     this.logger.error(`Error during image creation for product ${productId}. Cleaning up temp file: ${tempFileName}`, error.stack, ProductImageService.name);
                     const tempFilePath = join(TEMP_PATH, tempFileName);
@@ -85,7 +84,6 @@ export class ProductImageService {
             throw new ForbiddenException('You are not allowed to delete this image.');
         }
 
-        // image.url is like '/images/products/filename.ext'
         const filePath = join(UPLOAD_DIR_PRODUCTS, basename(image.url));
 
         if (existsSync(filePath)) {

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
 import { PrismaModule } from './prisma/prisma.module';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
@@ -52,13 +53,14 @@ import { CartModule } from './cart/cart.module';
             provide: 'APP_LICENSE_URL',
             useValue: 'https://opensource.org/licenses/MIT',
         },
-        ...(process.env.NODE_ENV === 'test'
-            ? []
-            : [{
-                provide: 'APP_GUARD',
-                useClass: ThrottlerGuard
-            }]
-        )
+        {
+            provide: APP_GUARD,
+            useFactory: (configService: ConfigService) => {
+                const nodeEnv = configService.get<string>('NODE_ENV');
+                return nodeEnv === 'test' ? null : ThrottlerGuard;
+            },
+            inject: [ConfigService],
+        },
     ],
 })
 export class AppModule {}

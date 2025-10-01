@@ -17,7 +17,13 @@ export class CustomerService {
 
     async create(dto: CreateCustomerDto) {
         this.logger.debug(`Attempting to create customer with email: ${dto.email}`, CustomerService.name);
-        if ((await this.prisma.customer.count({ where: { email: dto.email } }))) {
+        
+        const existingCustomer = await this.prisma.customer.findUnique({
+            where: { email: dto.email },
+            select: { id: true }
+        });
+
+        if (existingCustomer) {
             this.logger.warn(`Failed to create customer. Email already exists: ${dto.email}`, CustomerService.name);
             throw new ConflictException('Email already exists');
         }
@@ -29,7 +35,7 @@ export class CustomerService {
                 data: {
                     ...restWithoutProvider,
                     passwordHash: await argon2.hash(password),
-                    provider: provider as any, // TODO: Replace 'any' with 'PROVIDER' if we have the enum imported
+                    provider: provider as any,
                 }
             });
             this.logger.log(`Successfully created customer with ID: ${newCustomer.id}`, CustomerService.name);
@@ -113,26 +119,31 @@ export class CustomerService {
     }
 
     async update(id: string, dto: UpdateCustomerDto) {
-        this.logger.debug(`Attempting to update customer ${id} with DTO: ${JSON.stringify(dto)}`, CustomerService.name);
-        if (!(await this.prisma.customer.count({ where: { id } }))) {
-            this.logger.warn(`Update failed: Customer with ID ${id} not found.`, CustomerService.name);
-            throw new NotFoundException('Customer not found');
-        }
-
-        const { provider, providerId, ...restWithoutProvider } = dto;
-        const updatedCustomer = await this.prisma.customer.update({
-            where: { id },
-            data: {
-                ...restWithoutProvider,
-            },
-            select: {
-                id: true,
-                name: true,
-                email: true,
-                phone: true,
+        this.logger.debug(`Attempting to update customer ${id}`, CustomerService.name);
+        
+        try {
+            const { provider, providerId, ...restWithoutProvider } = dto;
+            const updatedCustomer = await this.prisma.customer.update({
+                where: { id },
+                data: {
+                    ...restWithoutProvider,
+                },
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    phone: true,
+                }
+            });
+            this.logger.log(`Successfully updated customer with ID: ${id}`, CustomerService.name);
+            return updatedCustomer;
+        } catch (error) {
+            if (error.code === 'P2025') {
+                // Prisma error code for "Record not found"
+                this.logger.warn(`Update failed: Customer with ID ${id} not found.`, CustomerService.name);
+                throw new NotFoundException('Customer not found');
             }
-        });
-        this.logger.log(`Successfully updated customer with ID: ${id}`, CustomerService.name);
-        return updatedCustomer;
+            throw error;
+        }
     }
 }

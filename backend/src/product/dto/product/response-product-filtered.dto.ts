@@ -1,10 +1,36 @@
+import { ApiProperty } from "@nestjs/swagger";
 import { ResponseProductDto } from "./response-product.dto";
 
-export interface ResponseProductFilteredDto {
+class MetaDto {
+    @ApiProperty({
+        description: 'Total number of pages',
+        example: 10
+    })
+    readonly totalPages: number;
+
+    @ApiProperty({
+        description: 'Current page number',
+        example: 1
+    })
+    readonly currentPage: number;
+
+    @ApiProperty({
+        description: 'Total number of products matching the filter',
+        example: 100
+    })
+    readonly totalProducts: number;
+}
+
+export class ResponseProductFilteredDto {
+    @ApiProperty({
+        description: 'List of products',
+        type: [ResponseProductDto]
+    })
     readonly products: ResponseProductDto[];
-    readonly meta: {
-        readonly totalPages: number;
-        readonly currentPage: number;
-        readonly totalProducts: number;
-    }
+
+    @ApiProperty({
+        description: 'Pagination metadata',
+        type: MetaDto
+    })
+    readonly meta: MetaDto;
 }

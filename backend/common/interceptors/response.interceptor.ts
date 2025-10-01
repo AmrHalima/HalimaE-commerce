@@ -51,7 +51,6 @@ export class ResponseInterceptor<T> implements NestInterceptor<T, ApiResponse<T>
 
                 const apiResponse = ApiResponse.success(data, message);
                 apiResponse.statusCode = statusCode;
-                apiResponse.path = request.url;
 
                 return apiResponse;
             }),

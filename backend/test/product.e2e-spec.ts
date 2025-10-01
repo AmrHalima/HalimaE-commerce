@@ -104,7 +104,7 @@ describe('ProductController (e2e)', () => {
                 sku: 'E2E-TSHIRT-RED-L',
                 size: 'L',
                 color: 'Red',
-                prices: [{ currency: 'USD', amount: new Prisma.Decimal('25.99') }],
+                prices: [{ currency: 'EGP', amount: new Prisma.Decimal('25.99') }],
                 inventory: { stockOnHand: 100 },
                 isActive: true,
                 material: 'Cotton'
@@ -286,7 +286,7 @@ describe('ProductController (e2e)', () => {
                 sku: 'E2E-TSHIRT-BLUE-M',
                 color: 'Blue',
                 size: 'M',
-                prices: [{ currency: 'USD', amount: new Prisma.Decimal('24.99') }],
+                prices: [{ currency: 'EGP', amount: new Prisma.Decimal('24.99') }],
             };
 
             const response = await request(app.getHttpServer())
@@ -344,7 +344,7 @@ describe('ProductController (e2e)', () => {
                     status: 'ACTIVE',
                     categoryId: categoryId,
                     description: 'This product will be deleted.',
-                    variants: { create: { sku: 'DEL-VAR', prices: { create: { currency: 'USD', amount: 1 } } } },
+                    variants: { create: { sku: 'DEL-VAR', prices: { create: { currency: 'EGP', amount: 1 } } } },
                     images: { create: { url: '/del-img.png', sort: 1 } },
                 },
                 include: { variants: true, images: true },

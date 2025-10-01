@@ -25,6 +25,7 @@ model Category {
   products Product[]
 
   @@index([parentId])
+  @@index([name]) // Added for search and ordering optimization
 }
 
 model Product {
@@ -44,12 +45,17 @@ model Product {
   collections CollectionProduct[]
 
   @@index([categoryId])
+  @@index([status])
+  @@index([categoryId, status])
+  @@index([status, createdAt])
+  @@index([deletedAt])
+  @@index([name]) // Added for text search optimization
 }
 
 model ProductVariant {
   id        String  @id @default(uuid()) @db.Uuid
   productId String  @db.Uuid
-  product   Product @relation(fields: [productId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   sku       String  @unique
   size      String?
   color     String?
@@ -62,24 +68,30 @@ model ProductVariant {
   orderItems OrderItem[]
 
   @@index([productId])
+  @@index([isActive])
+  @@index([productId, isActive]) 
 }
 
 model VariantPrice {
   id        String         @id @default(uuid()) @db.Uuid
   variantId String         @db.Uuid
-  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
   currency  String
   amount    Decimal        @db.Decimal(10, 2)
   compareAt Decimal?       @db.Decimal(10, 2)
 
+  @@unique([variantId, currency])
   @@index([variantId])
+  @@index([currency])
 }
 
 model VariantInventory {
   id          String         @id @default(uuid()) @db.Uuid
   variantId   String         @db.Uuid
-  variant     ProductVariant @relation(fields: [variantId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  variant     ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
   stockOnHand Int
+  lowStockThreshold Int? @default(10)
+  updatedAt   DateTime @updatedAt
 
   @@unique([variantId])
 }
@@ -169,18 +181,24 @@ model Customer {
   phone        String?
   passwordHash String?
   status       Status?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   addresses Address[]
   carts     Cart[]
   orders    Order[]
-
+ 
+  @@index([status])
+  @@index([createdAt])
+  @@index([status, createdAt])
+  @@index([email])
   @@map("customers")
 }
 
 model Address {
   id         String   @id @default(uuid()) @db.Uuid
   customerId String   @db.Uuid
-  customer   Customer @relation(fields: [customerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
   firstName  String
   lastName   String
   phone      String?
@@ -190,37 +208,44 @@ model Address {
   country    String
   postalCode String
   isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt 
 
   billingOrders  Order[] @relation("BillingAddress")
   shippingOrders Order[] @relation("ShippingAddress")
 
   @@index([customerId])
+  @@index([customerId, isDefault])
   @@map("addresses")
 }
 
 model Cart {
   id         String   @id @default(uuid()) @db.Uuid
   customerId String   @db.Uuid
-  customer   Customer @relation(fields: [customerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
   items CartItem[]
 
+  @@unique([customerId])
   @@index([customerId])
+  @@index([customerId, updatedAt])
   @@map("carts")
 }
 
 model CartItem {
   id        String         @id @default(uuid()) @db.Uuid
   cartId    String         @db.Uuid
-  cart      Cart           @relation(fields: [cartId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  cart      Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade) 
   variantId String         @db.Uuid
-  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
   qty       Int
 
+  @@unique([cartId, variantId]) 
   @@index([cartId])
   @@index([variantId])
+  @@index([cartId, variantId])
   @@map("cart_items")
 }
 
@@ -248,6 +273,12 @@ model Order {
   @@index([customerId])
   @@index([billingAddressId])
   @@index([shippingAddressId])
+  @@index([status])
+  @@index([customerId, status])
+  @@index([placedAt])
+  @@index([paymentStatus])
+  @@index([fulfillmentStatus])
+  @@index([customerId, placedAt])
   @@map("orders")
 }
 

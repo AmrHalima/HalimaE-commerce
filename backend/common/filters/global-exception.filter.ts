@@ -5,6 +5,7 @@ import {
     HttpException,
     HttpStatus,
     Injectable,
+    type LoggerService,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { ApiResponse, ErrorResponseDto } from '../dto/response.dto';
@@ -14,7 +15,7 @@ import { LogService } from '../../src/logger/log.service';
 @Injectable()
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
-    constructor(private readonly logger: LogService) {}
+    constructor(private readonly logger: LoggerService) {}
 
     catch(exception: unknown, host: ArgumentsHost) {
         const ctx = host.switchToHttp();
@@ -73,7 +74,6 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         // Create the standardized error response
         const apiResponse = ApiResponse.error(errorResponse);
         apiResponse.statusCode = httpStatus;
-        apiResponse.path = request.url;
 
         response.status(httpStatus).json(apiResponse);
     }
