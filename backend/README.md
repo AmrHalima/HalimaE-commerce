@@ -61,10 +61,6 @@ A robust, production-ready e-commerce backend built with NestJS, Prisma, and Pos
    # JWT Secrets (generate strong random strings)
    JWT_USER_SECRET=your_secure_admin_jwt_secret_here
    JWT_CUSTOMER_SECRET=your_secure_customer_jwt_secret_here
-
-   # File Upload
-   MAX_FILE_SIZE=5242880  # 5MB in bytes
-   ALLOWED_FILE_TYPES=image/jpeg,image/png,image/webp
    ```
 
 4. **Database Setup**
