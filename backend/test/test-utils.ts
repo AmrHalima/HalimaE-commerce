@@ -14,7 +14,6 @@ export function expectSuccessResponse<T>(response: any, expectedStatusCode: numb
     expect(response.body).toHaveProperty('message');
     expect(response.body).toHaveProperty('statusCode', expectedStatusCode);
     expect(response.body).toHaveProperty('timestamp');
-    expect(response.body).toHaveProperty('path');
     expect(response.body.error).toBeNull();
 
     // Validate timestamp format
@@ -35,7 +34,6 @@ export function expectErrorResponse(response: any, expectedStatusCode: number): 
     expect(response.body.error).not.toBeNull();
     expect(response.body).toHaveProperty('statusCode', expectedStatusCode);
     expect(response.body).toHaveProperty('timestamp');
-    expect(response.body).toHaveProperty('path');
 
     // Validate error object structure
     const error = response.body.error;

@@ -92,7 +92,7 @@ describe('CartController (e2e)', () => {
         await prisma.variantPrice.create({
             data: {
                 variantId: variantId,
-                currency: 'USD',
+                currency: 'EGP',
                 amount: 29.99,
                 compareAt: 39.99,
             },
@@ -204,7 +204,7 @@ describe('CartController (e2e)', () => {
             expect(item.variant.product).toHaveProperty('name', productData.name);
             expect(item.variant.prices).toHaveLength(1);
             expect(item.variant.prices[0]).toHaveProperty('amount');
-            expect(item.variant.prices[0]).toHaveProperty('currency', 'USD');
+            expect(item.variant.prices[0]).toHaveProperty('currency', 'EGP');
         });
 
         it('should return 404 if customer has no cart', async () => {
@@ -277,25 +277,25 @@ describe('CartController (e2e)', () => {
     });
 
     describe('GET /cart/total', () => {
-        it('should calculate cart total in USD', async () => {
+        it('should calculate cart total in EGP', async () => {
             const response = await request(app.getHttpServer())
                 .get('/api/cart/total')
                 .set('Authorization', `Bearer ${customerToken}`);
 
             const data = expectSuccessResponse<any>(response, 200);
             expect(data).toHaveProperty('total', 89.97); // 29.99 * 3
-            expect(data).toHaveProperty('currency', 'USD');
+            expect(data).toHaveProperty('currency', 'EGP');
             expect(data).toHaveProperty('itemCount', 3);
         });
 
         it('should calculate cart total in specified currency', async () => {
             const response = await request(app.getHttpServer())
-                .get('/api/cart/total?currency=USD')
+                .get('/api/cart/total?currency=EGP')
                 .set('Authorization', `Bearer ${customerToken}`);
 
             const data = expectSuccessResponse<any>(response, 200);
             expect(data).toHaveProperty('total', 89.97);
-            expect(data).toHaveProperty('currency', 'USD');
+            expect(data).toHaveProperty('currency', 'EGP');
         });
     });
 
@@ -370,7 +370,7 @@ describe('CartController (e2e)', () => {
                 .delete(`/api/cart/items/${itemId}`)
                 .set('Authorization', `Bearer ${customerToken}`);
 
-            expectSuccessResponse<any>(response, 200);
+            expect(response.status).toBe(204);
 
             // Verify item is removed
             const updatedCartResponse = await request(app.getHttpServer())
@@ -405,8 +405,7 @@ describe('CartController (e2e)', () => {
                 .delete('/api/cart')
                 .set('Authorization', `Bearer ${customerToken}`);
 
-            const data = expectSuccessResponse<any>(response, 200);
-            expect(data).toHaveProperty('message', 'Cart cleared successfully');
+            expect(response.status).toBe(204);
 
             // Verify cart is empty
             const cartResponse = await request(app.getHttpServer())
@@ -460,7 +459,7 @@ describe('CartController (e2e)', () => {
             await prisma.variantPrice.create({
                 data: {
                     variantId: variant2.id,
-                    currency: 'USD',
+                    currency: 'EGP',
                     amount: 34.99,
                 },
             });

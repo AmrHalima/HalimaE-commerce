@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { LogService } from '../logger/log.service';
 import { 
@@ -14,9 +15,9 @@ export class CartService {
     constructor(
         private readonly prismaService: PrismaService,
         private readonly logger: LogService,
+        private readonly configService: ConfigService,
     ) { }
 
-    // Create cart for customer (usually called automatically)
     async createCart(createCartDto: CreateCartDto) {
         return this.prismaService.cart.create({
             data: {
@@ -25,7 +26,6 @@ export class CartService {
         });
     }
 
-    // Get full cart details for display/management
     async getCart(customerId: string): Promise<CartResponseDto> {
         this.logger.debug(`Getting cart for customer: ${customerId}`, 'CartService');
         
@@ -130,56 +130,87 @@ export class CartService {
         return result._sum.qty || 0;
     }
 
-    // Add item to cart or update quantity if exists
     async addToCart(customerId: string, addToCartDto: AddToCartDto) {
-        // Use a transaction to handle race conditions
-        return this.prismaService.$transaction(async (prisma) => {
-            // Find or create cart
-            let cart = await prisma.cart.findFirst({
-                where: { customerId }
-            });
-
-            if (!cart) {
-                cart = await prisma.cart.create({
-                    data: { customerId }
+        try {
+            return await this.prismaService.$transaction(async (prisma) => {
+                const variant = await prisma.productVariant.findUnique({
+                    where: { id: addToCartDto.variantId },
+                    include: { inventory: true },
                 });
-            }
 
-            // First try to update existing item
-            const updatedItem = await prisma.cartItem.updateMany({
-                where: {
-                    cartId: cart.id,
-                    variantId: addToCartDto.variantId
-                },
-                data: {
-                    qty: {
-                        increment: addToCartDto.qty
+                if (!variant) {
+                    throw new NotFoundException('Product variant not found');
+                }
+
+                if (!variant.isActive) {
+                    throw new BadRequestException('Product variant is not available');
+                }
+
+                if (variant.inventory) {
+                    const currentCartItem = await prisma.cartItem.findFirst({
+                        where: {
+                            cart: { customerId },
+                            variantId: addToCartDto.variantId
+                        }
+                    });
+                    
+                    const currentQty = currentCartItem?.qty || 0;
+                    const newTotalQty = currentQty + addToCartDto.qty;
+                    
+                    if (variant.inventory.stockOnHand < newTotalQty) {
+                        throw new BadRequestException(
+                            `Only ${variant.inventory.stockOnHand} units available`
+                        );
                     }
                 }
-            });
 
-            // If no rows were updated, create new item
-            if (updatedItem.count === 0) {
-                return prisma.cartItem.create({
-                    data: {
+                let cart = await prisma.cart.findFirst({
+                    where: { customerId }
+                });
+
+                if (!cart) {
+                    cart = await prisma.cart.create({
+                        data: { customerId }
+                    });
+                }
+
+                // Get existing item to check current quantity
+                const existingItem = await prisma.cartItem.findFirst({
+                    where: {
                         cartId: cart.id,
-                        variantId: addToCartDto.variantId,
-                        qty: addToCartDto.qty
+                        variantId: addToCartDto.variantId
                     }
                 });
-            }
 
-            // Return the updated item
-            return prisma.cartItem.findFirst({
-                where: {
-                    cartId: cart.id,
-                    variantId: addToCartDto.variantId
+                if (existingItem) {
+                    return prisma.cartItem.update({
+                        where: { id: existingItem.id },
+                        data: {
+                            qty: {
+                                increment: addToCartDto.qty
+                            }
+                        }
+                    });
+                } else {
+                    return prisma.cartItem.create({
+                        data: {
+                            cartId: cart.id,
+                            variantId: addToCartDto.variantId,
+                            qty: addToCartDto.qty
+                        }
+                    });
                 }
             });
-        });
+        } catch (error) {
+            this.logger.error(
+                `Failed to add item to cart for customer ${customerId}`,
+                error.stack,
+                'CartService'
+            );
+            throw error;
+        }
     }
 
-    // Update cart item quantity
     async updateCartItem(customerId: string, itemId: string, updateCartItemDto: UpdateCartItemDto) {
         const cartItem = await this.prismaService.cartItem.findFirst({
             where: {
@@ -207,7 +238,6 @@ export class CartService {
         });
     }
 
-    // Remove item from cart
     async removeFromCart(customerId: string, itemId: string) {
         const cartItem = await this.prismaService.cartItem.findFirst({
             where: {
@@ -227,7 +257,6 @@ export class CartService {
         });
     }
 
-    // Clear entire cart
     async clearCart(customerId: string) {
         const cart = await this.prismaService.cart.findFirst({
             where: { customerId }
@@ -240,13 +269,15 @@ export class CartService {
         await this.prismaService.cartItem.deleteMany({
             where: { cartId: cart.id }
         });
-
-        return { message: 'Cart cleared successfully' };
     }
 
-    // Calculate cart totals (useful for checkout)
     async calculateCartTotal(customerId: string, currency: string = 'EGP') {
         const cart = await this.getCartForCheckout(customerId);
+        const isDevelopment = this.configService.get<string>('NODE_ENV') === 'development';
+        
+        if (isDevelopment) {
+            this.logger.debug(`Calculate cart total - Cart found: ${!!cart}, Items: ${cart?.items.length || 0}, Currency: ${currency}`, 'CartService');
+        }
         
         if (!cart || cart.items.length === 0) {
             return { total: 0, currency, itemCount: 0 };
@@ -256,10 +287,47 @@ export class CartService {
         
         cart.items.forEach(item => {
             const price = item.variant.prices.find(p => p.currency === currency);
+            
             if (price) {
-                total += Number(price.amount) * item.qty;
+                const amount = Number(price.amount);
+                
+                // Validate price is positive
+                if (amount < 0) {
+                    this.logger.error(`Invalid negative price detected for variant ${item.variant.id}`, '', 'CartService');
+                    throw new BadRequestException('Invalid price detected');
+                }
+                
+                // Validate quantity is positive
+                if (item.qty < 0) {
+                    this.logger.error(`Invalid negative quantity detected for cart item`, '', 'CartService');
+                    throw new BadRequestException('Invalid quantity detected');
+                }
+                
+                const itemTotal = amount * item.qty;
+                
+                // Check for overflow or invalid numbers
+                if (!Number.isFinite(itemTotal)) {
+                    this.logger.error(`Price calculation overflow for variant ${item.variant.id}`, '', 'CartService');
+                    throw new BadRequestException('Price calculation error');
+                }
+                
+                total += itemTotal;
+                
+                if (isDevelopment) {
+                    this.logger.debug(`Price found - Amount: ${amount}, Qty: ${item.qty}, Item Total: ${itemTotal}`, 'CartService');
+                }
+            } else {
+                if (isDevelopment) {
+                    this.logger.debug(`No price found for currency: ${currency}`, 'CartService');
+                }
             }
         });
+
+        // Final validation
+        if (total < 0 || !Number.isFinite(total)) {
+            this.logger.error(`Invalid cart total calculated: ${total}`, '', 'CartService');
+            throw new BadRequestException('Cart total calculation error');
+        }
 
         return {
             total: Number(total.toFixed(2)),

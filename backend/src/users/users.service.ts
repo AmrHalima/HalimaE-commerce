@@ -22,7 +22,8 @@ export class UsersService {
 
   // create user: connect role by roleId
   async create(dto: CreateUserDto): Promise<ReturnType<typeof this.toUserResponse>> {
-    if ( (await this.prisma.user.count({ where: { email: dto.email } })) ) {
+    const existingUser = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    if (existingUser) {
         this.logger.warn(`User creation failed. Email already exists: ${dto.email}`, UsersService.name);
         throw new ConflictException(`User with email ${dto.email} already exists`);
     }

@@ -22,19 +22,22 @@ export class CategoryService {
         orderDirection: string  = 'asc',
         search?: string
     ): Promise<ResponseCategoriesFilteredDto> {
+        const where = search ? {
+            name: {
+                contains: search,
+                mode: 'insensitive' as const, // Case-insensitive search
+            }
+        } : {};
+
         const [totalCategories, categories] = await this.prisma.$transaction([
-            this.prisma.category.count({where: {name: search }}),
+            this.prisma.category.count({ where }),
             this.prisma.category.findMany({
                 skip: (page - 1) * limit,
                 take: limit,
                 orderBy: {
                     [orderBy]: orderDirection
                 },
-                where: {
-                    name: {
-                        contains: search
-                    }
-                },
+                where,
                 include: {
                     parent: true
                 }

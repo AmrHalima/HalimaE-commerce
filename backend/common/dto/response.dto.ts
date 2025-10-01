@@ -10,7 +10,6 @@ export class ApiResponse<T> {
     message?: string;
     statusCode?: number;
     timestamp?: string;
-    path?: string;
 
     constructor(success: boolean, data?: T, error: ErrorResponseDto | null = null, message?: string) {
         this.success = success;

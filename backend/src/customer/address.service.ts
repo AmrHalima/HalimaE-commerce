@@ -9,23 +9,22 @@ export class AddressService {
     ) { }
 
     async findById(customerId: string, id: string) {
-        if (! (await this.prisma.address.count({where: {id, customerId}})) )
-            throw new NotFoundException('Address not found');
-
-        return this.prisma.address.findUnique({
-            where: { id },
+        const address = await this.prisma.address.findFirst({
+            where: { id, customerId },
         });
-    }
-            
 
-    // TODO: CREATE RESPONSE DTO
+        if (!address) {
+            throw new NotFoundException('Address not found');
+        }
+
+        return address;
+    }
+
     async findAll(customerId: string) {
         const addresses = await this.prisma.address.findMany({
             where: { customerId },
+            orderBy: { isDefault: 'desc' }, // Show default address first
         });
-
-        if (!addresses)
-            throw new NotFoundException('Addresses not found');
 
         return addresses;
     }
@@ -40,27 +39,46 @@ export class AddressService {
     }
 
     async update(customerId: string, id: string, updateAddressDto: UpdateAddressDto) {
-        if (! (await this.prisma.address.count({where: {id, customerId}})) )
-            throw new NotFoundException('Address not found');
+        try {
+            const updated = await this.prisma.address.updateMany({
+                where: { id, customerId }, // Ensure address belongs to customer
+                data: {
+                    ...updateAddressDto
+                },
+            });
 
-        const updated = await this.prisma.address.update({
-            where: { id },
-            data: {
-                ...updateAddressDto
-            },
-        });
+            if (updated.count === 0) {
+                throw new NotFoundException('Address not found');
+            }
 
-        return updated;
+            // Return the updated address
+            return this.prisma.address.findUnique({
+                where: { id },
+            });
+        } catch (error) {
+            if (error instanceof NotFoundException) {
+                throw error;
+            }
+            throw error;
+        }
     }
 
     async delete(customerId: string, id: string) {
-        if (! (await this.prisma.address.count({where: {id, customerId}})) )
-            throw new NotFoundException('Address not found');
+        try {
+            const deleted = await this.prisma.address.deleteMany({
+                where: { id, customerId }, // Ensure address belongs to customer
+            });
 
-        await this.prisma.address.delete({
-            where: { id },
-        });
+            if (deleted.count === 0) {
+                throw new NotFoundException('Address not found');
+            }
 
-        return true;
+            return { message: 'Address deleted successfully' };
+        } catch (error) {
+            if (error instanceof NotFoundException) {
+                throw error;
+            }
+            throw error;
+        }
     }
 }
