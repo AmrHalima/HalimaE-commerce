@@ -1,98 +1,280 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Halima E-Commerce Backend API
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A robust, production-ready e-commerce backend built with NestJS, Prisma, and PostgreSQL. This API provides comprehensive e-commerce functionality including product management, user authentication, shopping cart, orders, and payment processing.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## 🚀 Features
 
-## Description
+### Core Functionality
+- **Product Management**: Full CRUD operations with variants, pricing, and inventory tracking
+- **Category System**: Hierarchical categories with parent-child relationships
+- **Shopping Cart**: Persistent cart with real-time inventory validation
+- **Order Management**: Complete order lifecycle from placement to fulfillment
+- **User Authentication**: Dual authentication system for customers and admin users
+- **Address Management**: Multiple shipping and billing addresses per customer
+- **Payment Processing**: Payment integration with refund support
+- **Shipment Tracking**: Order fulfillment and delivery tracking
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+### Technical Features
+- **JWT Authentication**: Separate JWT strategies for customers and admin users
+- **Role-Based Access Control**: Admin and customer role separation
+- **Rate Limiting**: Three-tier throttling (3/1s, 20/10s, 100/60s)
+- **API Documentation**: Auto-generated Swagger/OpenAPI documentation
+- **Image Upload**: Product image management with file storage
+- **Database Optimization**: Comprehensive indexing for high-performance queries
+- **Logging**: Winston-based logging with daily rotation
+- **Security**: Helmet middleware, CORS configuration, password hashing with Argon2
+- **Validation**: Request validation with class-validator and class-transformer
+- **E2E Testing**: Comprehensive end-to-end test coverage
 
-## Project setup
+## 📋 Prerequisites
 
+- Node.js >= 18.x
+- PostgreSQL >= 14.x
+- npm >= 9.x
+
+## 🛠️ Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/AmrHalima/HalimaE-commerce.git
+   cd HalimaE-commerce/backend
+   ```
+
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+3. **Environment Configuration**
+
+   Create a `.env` file in the backend directory:
+
+   ```env
+   # Database
+   DATABASE_URL="postgresql://user:password@localhost:5432/halima_ecommerce?schema=public"
+
+   # Application
+   NODE_ENV=development
+   PORT=3000
+   FRONTEND_URL=http://localhost:3001
+
+   # JWT Secrets (generate strong random strings)
+   JWT_USER_SECRET=your_secure_admin_jwt_secret_here
+   JWT_CUSTOMER_SECRET=your_secure_customer_jwt_secret_here
+   ```
+
+4. **Database Setup**
+
+   ```bash
+   # Generate Prisma Client
+   npx prisma generate
+
+   # Run migrations
+   npx prisma migrate deploy
+
+   # Seed database (optional)
+   npm run db:seed
+   ```
+
+## 🚀 Running the Application
+
+### Development
 ```bash
-$ npm install
+# Start in watch mode
+npm run start:dev
+
+# Start in debug mode
+npm run start:debug
 ```
 
-## Compile and run the project
-
+### Production
 ```bash
-# development
-$ npm run start
+# Build the application
+npm run build
 
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+# Start production server
+npm run start:prod
 ```
 
-## Run tests
+The API will be available at `http://localhost:3000`
 
-```bash
-# unit tests
-$ npm run test
+## 📚 API Documentation
 
-# e2e tests
-$ npm run test:e2e
+Once the application is running, visit:
+- **Swagger UI**: `http://localhost:3000/api/docs`
+- **OpenAPI JSON**: `http://localhost:3000/api/docs-json`
 
-# test coverage
-$ npm run test:cov
+## 🗄️ Database Schema
+
+### Main Entities
+
+#### Product System
+- **Product**: Core product information with status and soft delete
+- **ProductVariant**: SKU-based variants (size, color, material)
+- **VariantPrice**: Multi-currency pricing with compare-at prices
+- **VariantInventory**: Stock management with low-stock alerts
+- **ProductImage**: Product images with sorting and alt text
+- **Category**: Hierarchical category structure
+
+#### Customer & Orders
+- **Customer**: Customer accounts with authentication
+- **Address**: Multiple addresses per customer
+- **Cart**: Persistent shopping cart with items
+- **Order**: Complete order with status tracking
+- **OrderItem**: Individual line items with snapshots
+- **Payment**: Payment records with provider integration
+- **Refund**: Refund processing
+- **Shipment**: Shipping and tracking information
+
+#### Administration
+- **User**: Admin user accounts
+- **Role**: Role-based access control
+
+## 🏗️ Project Structure
+
+```
+backend/
+├── src/
+│   ├── auth/                  # Authentication modules
+│   │   ├── customer-auth/     # Customer JWT auth
+│   │   └── user-auth/         # Admin user JWT auth
+│   ├── cart/                  # Shopping cart
+│   ├── category/              # Category management
+│   ├── customer/              # Customer & address management
+│   ├── product/               # Product, variant, image services
+│   ├── users/                 # Admin user management
+│   ├── logger/                # Winston logging service
+│   ├── prisma/                # Prisma database service
+│   └── utils/                 # Shared utilities
+├── common/
+│   ├── decorators/            # Custom decorators
+│   ├── dto/                   # Shared DTOs
+│   ├── filters/               # Exception filters
+│   └── interceptors/          # Response interceptors
+├── prisma/
+│   ├── schema.prisma          # Database schema
+│   ├── migrations/            # Migration history
+│   └── seed.ts                # Database seeding
+├── test/                      # E2E tests
+└── public/uploads/            # Uploaded files
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+## 🧪 Testing
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+# Unit tests
+npm run test
+
+# E2E tests
+npm run test:e2e
+
+# Test coverage
+npm run test:cov
+
+# Watch mode
+npm run test:watch
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+## 🔒 Security Features
 
-## Resources
+- **Password Hashing**: Argon2 algorithm for secure password storage
+- **JWT Tokens**: Separate tokens for customers and admin users
+- **Rate Limiting**: Automatic throttling to prevent abuse
+- **Helmet**: Security headers configuration
+- **CORS**: Controlled cross-origin resource sharing
+- **Input Validation**: All inputs validated with class-validator
+- **SQL Injection Protection**: Prisma's query parameterization
+- **ConfigService**: Environment variables managed securely
 
-Check out a few resources that may come in handy when working with NestJS:
+## 📊 Performance Optimizations
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+- **Database Indexes**: 15+ strategic indexes on frequently queried fields
+- **Query Optimization**: Efficient queries with `findUnique()` on indexed fields
+- **Connection Pooling**: Prisma connection management
+- **Response Caching**: Structured response format for easy caching
+- **Lazy Loading**: Related entities loaded on demand
+- **File Upload Optimization**: Size and type restrictions
 
-## Support
+## 🔧 Database Scripts
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+```bash
+# Create a new migration
+npx prisma migrate dev --name migration_name
 
-## Stay in touch
+# Apply migrations
+npx prisma migrate deploy
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+# Reset database (development only)
+npx prisma migrate reset
 
-## License
+# Open Prisma Studio
+npx prisma studio
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+# Seed the database
+npm run db:seed
+```
+
+## 📝 Code Quality
+
+```bash
+# Linting
+npm run lint
+
+# Format code
+npm run format
+```
+
+## 🌐 Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DATABASE_URL` | PostgreSQL connection string | Required |
+| `NODE_ENV` | Environment (development/production/test) | development |
+| `PORT` | Application port | 3000 |
+| `FRONTEND_URL` | Frontend origin for CORS | Required |
+| `JWT_USER_SECRET` | Admin JWT secret | Required |
+| `JWT_CUSTOMER_SECRET` | Customer JWT secret | Required |
+
+## 🐳 Docker Support (Coming Soon)
+
+Docker configuration will be added for containerized deployment.
+
+## 🚀 Deployment
+
+### Production Checklist
+1. Set `NODE_ENV=production`
+2. Use strong, unique JWT secrets
+3. Enable SSL/TLS for database connections
+4. Configure production logging (disable console logs)
+5. Set up database backups
+6. Configure file upload storage (S3, CDN)
+7. Enable application monitoring
+8. Set appropriate rate limits
+9. Configure CORS for production domain
+
+### Recommended Hosting
+- **API**: Heroku, AWS, DigitalOcean, Railway
+- **Database**: AWS RDS, DigitalOcean Managed Database, Supabase
+- **File Storage**: AWS S3, Cloudinary, DigitalOcean Spaces
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'feat: add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📄 License
+
+This project is licensed under the Apache-2.0 License - see the [LICENSE](../LICENSE) file for details.
+
+## 👨‍💻 Author
+
+**OmarElprolosy66**
+
+## Acknowledgments
+
+- [NestJS](https://nestjs.com/) - The progressive Node.js framework
+- [Prisma](https://www.prisma.io/) - Next-generation ORM
+- [PostgreSQL](https://www.postgresql.org/) - The world's most advanced open source database
