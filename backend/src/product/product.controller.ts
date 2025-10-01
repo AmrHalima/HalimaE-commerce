@@ -43,7 +43,8 @@ import { VariantInventoryDto } from './dto/variant/variant-inventory.dto';
 @ApiExtraModels(
     CreateProductDto, 
     UpdateProductDto, 
-    ResponseProductDto, 
+    ResponseProductDto,
+    ResponseProductFilteredDto,
     FilterProductDto,
     ProductVariantDto,
     UpdateVariantDto,
