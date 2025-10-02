@@ -15,7 +15,8 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiExtraModels } from '@nestjs/sw
 import { ApiStandardResponse, ApiStandardErrorResponse } from '../../common/swagger/api-response.decorator';
 import { CustomerService } from './customer.service';
 import { JwtCustomerGuard } from '../auth/customer-auth/guards/jwt.customer.guard';
-import { JwtUserGuard } from '../auth/user-auth/guards';
+import { JwtUserGuard, RolesGuard } from '../auth/user-auth/guards';
+import { Roles } from '../auth/user-auth/decorators';
 import {
     CreateAddressDto,
     UpdateCustomerDto,
@@ -61,8 +62,11 @@ export class CustomerController {
         return this.customerService.update(req.customer.id, dto);
     }
 
-    @UseGuards(JwtUserGuard)
-    @Get()
+    // Admin-only routes
+
+    @Roles('admin', 'employee')
+    @UseGuards(JwtUserGuard, RolesGuard)
+    @Get('admin/all')
     @ApiOperation({ summary: 'Get all customers (Admin)', description: 'Retrieve a paginated list of all customers. Requires admin or employee authentication.' })
     @ApiBearerAuth()
     @ApiStandardResponse(Object, 'Customers retrieved successfully')
@@ -84,6 +88,8 @@ export class CustomerController {
             order,
         );
     }
+
+    // Customer address routes
 
     @UseGuards(JwtCustomerGuard)
     @Post('addresses')

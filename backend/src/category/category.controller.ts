@@ -127,12 +127,14 @@ export class CategoryController {
         return this.categoryService.update(id, updateCategoryDto);
     }
 
-    @Delete(':id')
+    // Admin-only routes
+
+    @Delete('admin/:id')
     @Roles('admin')
     @UseGuards(JwtUserGuard, RolesGuard)
     @ApiBearerAuth('JWT-auth')
     @ApiOperation({
-        summary: 'Delete a category',
+        summary: 'Delete a category (Admin)',
         description: 'Delete an existing category (Admin only)'
     })
     @ApiParam({ name: 'id', description: 'Category ID', example: '123e4567-e89b-12d3-a456-426614174000' })

@@ -10,6 +10,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { CustomerModule } from './customer/customer.module';
 import { LogModule } from './logger/log.module';
 import { CartModule } from './cart/cart.module';
+import { OrderModule } from './order/order.module';
 
 @Module({
     imports: [
@@ -31,6 +32,7 @@ import { CartModule } from './cart/cart.module';
         CustomerModule,
         LogModule,
         CartModule,
+        OrderModule,
     ],
     providers: [
         {
