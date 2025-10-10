@@ -1,26 +1,279 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ================= */
+/* Root + Dark Theme */
+/* ================= */
+@layer base {
+    :root,
+    [data-theme="light"] {
+        --primary: 187 47% 32%;
+        --foreground: 187 0% 10%;
+        --background: 187 100% 98%;
+        --radius: 0.625rem;
+
+        --card: 0 0% 100%;
+        --card-foreground: 0 0% 14.5%;
+
+        --popover: 0 0% 100%;
+        --popover-foreground: 0 0% 14.5%;
+
+        --primary-foreground: 186 100% 8%;
+
+        --secondary: 0 0% 97%;
+        --secondary-foreground: 0 0% 20.5%;
+
+        --muted: 0 0% 97%;
+        --muted-foreground: 0 0% 55.6%;
+
+        --accent: 0 0% 97%;
+        --accent-foreground: 0 0% 20.5%;
+
+        --destructive: 27.3 29.4% 57.7%;
+
+        --border: 0 0% 92.2%;
+        --input: 0 0% 92.2%;
+        --ring: 0 0% 70.8%;
+
+        --chart-1: 41.1 26.6% 64.6%;
+        --chart-2: 184.7 14.2% 60%;
+        --chart-3: 227.4 8.4% 39.8%;
+        --chart-4: 84.4 22.7% 82.8%;
+        --chart-5: 70.1 22.6% 76.9%;
+
+        --sidebar: 0 0% 98.5%;
+        --sidebar-foreground: 0 0% 14.5%;
+        --sidebar-primary: 0 0% 20.5%;
+        --sidebar-primary-foreground: 0 0% 98.5%;
+        --sidebar-accent: 0 0% 97%;
+        --sidebar-accent-foreground: 0 0% 20.5%;
+        --sidebar-border: 0 0% 92.2%;
+        --sidebar-ring: 0 0% 70.8%;
+    }
+
+    .dark,
+    [data-theme="dark"] {
+        --primary: 184 46% 65%;
+        --foreground: 180 60% 94%;
+        --background: 180 27% 8%;
+
+        --card: 0 0% 20.5%;
+        --card-foreground: 0 0% 98.5%;
+
+        --popover: 0 0% 20.5%;
+        --popover-foreground: 0 0% 98.5%;
+
+        --primary-foreground: 180 27% 8%;
+
+        --secondary: 0 0% 26.9%;
+        --secondary-foreground: 0 0% 98.5%;
+
+        --muted: 0 0% 26.9%;
+        --muted-foreground: 0 0% 70.8%;
+
+        --accent: 0 0% 26.9%;
+        --accent-foreground: 0 0% 98.5%;
+
+        --destructive: 22.2 22.9% 70.4%;
+
+        --border: 0 0% 100% / 0.1;
+        --input: 0 0% 100% / 0.15;
+        --ring: 0 0% 55.6%;
+
+        --chart-1: 264.4 24.3% 48.8%;
+        --chart-2: 162.5 17% 69.6%;
+        --chart-3: 70.1 18.8% 76.9%;
+        --chart-4: 303.9 26.5% 62.7%;
+        --chart-5: 16.4 24.6% 64.5%;
+
+        --sidebar: 0 0% 20.5%;
+        --sidebar-foreground: 0 0% 98.5%;
+        --sidebar-primary: 264.4 24.3% 48.8%;
+        --sidebar-primary-foreground: 0 0% 98.5%;
+        --sidebar-accent: 0 0% 26.9%;
+        --sidebar-accent-foreground: 0 0% 98.5%;
+        --sidebar-border: 0 0% 100% / 0.1;
+        --sidebar-ring: 0 0% 55.6%;
+    }
 }
 
+/* ======================== */
+/* Theme Variables (Inline) */
+/* ======================== */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --font-sans: var(--font-inter);
+    --font-script: var(--font-caveat);
+    --color-background: hsl(var(--background));
+    --color-foreground: hsl(var(--foreground));
+    --color-card: hsl(var(--card));
+    --color-card-foreground: hsl(var(--card-foreground));
+    --color-popover: hsl(var(--popover));
+    --color-popover-foreground: hsl(var(--popover-foreground));
+    --color-primary: hsl(var(--primary));
+    --color-primary-foreground: hsl(var(--primary-foreground));
+    --color-secondary: hsl(var(--secondary));
+    --color-secondary-foreground: hsl(var(--secondary-foreground));
+    --color-muted: hsl(var(--muted));
+    --color-muted-foreground: hsl(var(--muted-foreground));
+    --color-accent: hsl(var(--accent));
+    --color-accent-foreground: hsl(var(--accent-foreground));
+    --color-destructive: hsl(var(--destructive));
+    --color-destructive-foreground: hsl(var(--destructive-foreground));
+    --color-border: hsl(var(--border));
+    --color-border-subtle: var(--border-subtle);
+    --color-input: hsl(var(--input));
+    --color-ring: hsl(var(--ring));
+    --radius-sm: calc(var(--radius) - 0.25rem);
+    --radius-md: var(--radius);
+    --radius-lg: calc(var(--radius) + 0.25rem);
+    --radius-xl: calc(var(--radius) + 0.5rem);
+
+    /* Spacing */
+    --spacing-13: 3.25rem;
+    --spacing-15: 3.75rem;
+    --spacing-18: 4.5rem;
+    --spacing-128: 32rem;
+    --spacing-144: 36rem;
+    --transition-spacing: "margin, padding, inset";
+
+    /* Custom soft and premium layered shadows */
+    --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.04);
+    --shadow-md: 0 2px 8px -2px hsl(var(--primary) / 0.15),
+        0 1px 3px 0 hsl(0 0% 0% / 0.06);
+    --shadow-lg: 0 8px 24px -4px hsl(var(--primary) / 0.2);
+    --shadow-soft-sm: 0 2px 4px -1px rgba(0, 0, 0, 0.06),
+        0 2px 4px -2px rgba(0, 0, 0, 0.1);
+    --shadow-soft-md: 0 6px 10px -2px rgba(0, 0, 0, 0.06),
+        0 4px 6px -3px rgba(0, 0, 0, 0.1);
+    --shadow-soft-lg: 0 12px 20px -4px rgba(0, 0, 0, 0.06),
+        0 8px 10px -6px rgba(0, 0, 0, 0.1);
+    --shadow-soft-xl: 0 24px 38px -8px rgba(0, 0, 0, 0.06),
+        0 9px 46px -10px rgba(0, 0, 0, 0.1);
+    --shadow-premium-md: 0 4px 6px -1px hsl(0 0 0 / 0.1),
+        0 2px 4px -2px hsl(0 0 0 / 0.1), 0 0 0 1px var(--border-subtle);
+    --shadow-premium-lg: 0 10px 15px -3px hsl(0 0 0 / 0.1),
+        0 4px 6px -4px hsl(0 0 0 / 0.1), 0 0 0 1px var(--border-subtle);
+    --shadow-soft-glow: 0 0 8px 2px rgba(100, 200, 255, 0.3);
+    --shadow-deep-blur: 0 20px 50px -10px rgba(0, 0, 0, 0.5);
+
+    /* Custom animations */
+    --animate-scale-in: scale-in 0.2s ease-out;
+    --animate-slide-in-from-bottom: slide-in-from-bottom 0.3s ease-out;
+    --animate-error-shake: error-shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+    --animate-shimmer: shimmer 2s linear infinite;
+    --animate-wiggle: wiggle 0.5s ease-in-out infinite;
+    --animate-subtle-pulse: subtlePulse 2s ease-in-out infinite;
+
+    @keyframes scale-in {
+        from {
+            opacity: 0;
+            transform: scale(0.95);
+        }
+        to {
+            opacity: 1;
+            transform: scale(1);
+        }
+    }
+    @keyframes slide-in-from-bottom {
+        from {
+            transform: translateY(20px);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+    @keyframes error-shake {
+        10%,
+        90% {
+            transform: translate3d(-1px, 0, 0);
+        }
+        20%,
+        80% {
+            transform: translate3d(2px, 0, 0);
+        }
+        30%,
+        50%,
+        70% {
+            transform: translate3d(-4px, 0, 0);
+        }
+        40%,
+        60% {
+            transform: translate3d(4px, 0, 0);
+        }
+    }
+    @keyframes shimmer {
+        0% {
+            background-position: -1000px 0;
+        }
+        100% {
+            background-position: 1000px 0;
+        }
+    }
+    @keyframes wiggle {
+        "0%, 100%": {
+            transform: "rotate(-3deg)";
+        }
+        , "50%": {
+            transform: "rotate(3deg)";
+        }
+    }
+    @keyframes subtlePulse {
+        "0%, 100%": {
+            opacity: 1;
+        }
+        , "50%": {
+            opacity: 0.5;
+        }
+    }
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+/* ============= */
+/* Global Styles */
+/* ============= */
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+    @apply text-foreground bg-background font-sans;
+}
+
+/* Headings */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+small {
+    @apply font-script font-extrabold;
+    letter-spacing: 0.1rem;
+    line-height: 1.2;
+}
+
+html {
+    font-size: 100%;
+} /* 16px */
+
+h1 {
+    font-size: 3.053rem; /* 48.8px */
+}
+
+h2 {
+    font-size: 2.442rem; /* 39.04px */
+}
+
+h3 {
+    font-size: 1.954rem; /* 31.2px */
+}
+
+h4 {
+    font-size: 1.563rem; /* 24.96px */
+}
+
+h5 {
+    font-size: 1.25rem; /* 20px */
+}
+
+small {
+    font-size: 0.8rem; /* 12.8px */
 }
