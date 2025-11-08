@@ -94,7 +94,7 @@ export class CartResponseDto {
     totalItems: number;
 
     @ApiProperty({ description: 'Estimated total price', example: 149.95, required: false })
-    estimatedTotal?: number; // Optional calculated field
+    estimatedTotal?: number;
 }
 
 class CheckoutVariantDto {
