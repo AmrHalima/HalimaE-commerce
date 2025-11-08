@@ -9,7 +9,6 @@ import { CustomerService } from "../../../customer/customer.service";
 export class JwtCustomerStrategy extends PassportStrategy(Strategy, 'jwt-customer') {
     constructor(
         private readonly configService: ConfigService,
-        // We need customer service to find the customer from the DB
         private readonly customerService: CustomerService,
     ) {
         const jwtSecret = configService.get<string>('JWT_CUSTOMER_SECRET');
@@ -24,7 +23,6 @@ export class JwtCustomerStrategy extends PassportStrategy(Strategy, 'jwt-custome
     }
 
     async validate(payload: any) {
-        // Instead of returning the payload, we'll find the customer in the database.
         const customer = await this.customerService.findById(payload.sub);
         if (!customer) {
             throw new UnauthorizedException('Customer not found');

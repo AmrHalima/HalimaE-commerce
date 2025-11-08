@@ -73,6 +73,7 @@ export class ProductService {
                             color: true,
                             material: true,
                             isActive: true,
+                            size: true,
                             inventory: { select: { id: true, stockOnHand: true, }}, 
                         }
                     } 
@@ -106,6 +107,7 @@ export class ProductService {
                         color: true,
                         material: true,
                         isActive: true,
+                        size: true,
                         inventory: { select: { id: true, stockOnHand: true, }}, 
                     }
                 }
@@ -154,6 +156,7 @@ export class ProductService {
                                 color: true,
                                 material: true,
                                 isActive: true,
+                                size: true,
                                 inventory: { select: { id: true, stockOnHand: true, }}, 
                             }
                         } 
@@ -190,6 +193,7 @@ export class ProductService {
                         color: true,
                         material: true,
                         isActive: true,
+                        size: true,
                         inventory: { select: { id: true, stockOnHand: true, }}, 
                     }
                 } 
