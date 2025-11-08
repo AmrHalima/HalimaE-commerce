@@ -71,7 +71,6 @@ export class FilterOrderDto {
     example: 'asc'
   })
   @IsOptional()
-  @IsString()
   @IsEnum(['asc', 'desc'])
   readonly sortOrder?: 'asc' | 'desc';
 }
