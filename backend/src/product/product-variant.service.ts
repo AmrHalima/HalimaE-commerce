@@ -18,6 +18,13 @@ export class ProductVariantService {
             this.logger.warn(`Attempted to create variant for product ${productId} without prices.`, ProductVariantService.name);
             throw new BadRequestException('Variant must include at least one price');
         }
+
+        // Inventory is required
+        if (!variantDto.inventory || variantDto.inventory.stockOnHand === null || variantDto.inventory.stockOnHand === undefined) {
+            this.logger.warn(`Attempted to create variant for product ${productId} without inventory.`, ProductVariantService.name);
+            throw new BadRequestException('Variant must include inventory with stockOnHand');
+        }
+
         try {
             const newVariant = await tx.productVariant.create({
                 data: {
@@ -36,11 +43,11 @@ export class ProductVariantService {
                             compareAt: price.compareAt,
                         })),
                     },
-                    inventory: (variantDto.inventory && variantDto.inventory.stockOnHand !== null && variantDto.inventory.stockOnHand !== undefined) ? {
+                    inventory: {
                         create: {
                             stockOnHand: variantDto.inventory.stockOnHand,
                         },
-                    } : undefined,
+                    },
                 },
                 include: {
                     prices: {
@@ -54,8 +61,15 @@ export class ProductVariantService {
                     inventory: { select: { id: true, stockOnHand: true }}
                 }
             });
+
+            // Ensure inventory was created
+            if (!newVariant.inventory) {
+                this.logger.error(`Failed to create inventory for variant ${newVariant.id}`, '', ProductVariantService.name);
+                throw new BadRequestException('Failed to create variant inventory');
+            }
+
             this.logger.log(`Successfully created variant ${newVariant.id} for product ${productId}`, ProductVariantService.name);
-            return newVariant;
+            return newVariant as ResponseVariantDto;
         } catch (error) {
             this.logger.error(`Failed to create variant for product ${productId}.`, error.stack, ProductVariantService.name);
             throw error;
@@ -122,8 +136,15 @@ export class ProductVariantService {
                 }
             },
         });
+
+        // Ensure inventory exists
+        if (!updatedVariant.inventory) {
+            this.logger.error(`Variant ${id} has no inventory after update`, '', ProductVariantService.name);
+            throw new BadRequestException('Variant inventory not found');
+        }
+
         this.logger.log(`Successfully updated variant ${id} for product ${productId}`, ProductVariantService.name);
-        return updatedVariant;
+        return updatedVariant as ResponseVariantDto;
     }
 
     async getVariantsByProductId(productId: string): Promise<ResponseVariantDto[]> {
@@ -135,6 +156,7 @@ export class ProductVariantService {
                 prices: { select: { id: true, compareAt: true, amount: true, currency: true }}, 
                 id: true,
                 sku: true,
+                size: true,
                 color: true,
                 material: true,
                 isActive: true,
@@ -142,17 +164,21 @@ export class ProductVariantService {
             }
         });
 
-        if (!variants) {
+        if (!variants || variants.length === 0) {
             this.logger.warn(`product with id ${productId} has no variants`, ProductVariantService.name);
             throw new NotFoundException(`product with id ${productId} has no variants`);
         }
-        
 
-        // return variants; // todo : solve this issue
-        return variants;
+        // Validate all variants have inventory (should always exist
+        const variantsWithoutInventory = variants.filter(v => !v.inventory);
+        if (variantsWithoutInventory.length > 0) {
+            const ids = variantsWithoutInventory.map(v => v.id).join(', ');
+            this.logger.error(`Variants without inventory found: ${ids}`, '', ProductVariantService.name);
+            throw new BadRequestException(`Some variants are missing inventory data`);
+        }
+
+        return variants as ResponseVariantDto[];
     }
-
-    
 
     async delete(productId: string, id: string, tx: Prisma.TransactionClient = this.prisma): Promise<void> {
         this.logger.debug(`Attempting to delete variant ${id} from product ${productId}`, ProductVariantService.name);
@@ -176,5 +202,87 @@ export class ProductVariantService {
 
         await tx.productVariant.delete({ where: { id } });
         this.logger.log(`Successfully deleted variant ${id} from product ${productId}`, ProductVariantService.name);
+    }
+
+    async getVariantById(id: string) {
+        const variant = await this.prisma.productVariant.findUnique({
+            where: { id },
+            select: {
+                id: true,
+                isActive: true,
+                sku: true,
+                product: {
+                    select: {
+                        name: true
+                    }
+                },
+                inventory: { select: { stockOnHand: true } }
+            }
+        });
+
+        if (!variant) {
+            throw new BadRequestException(
+                `Product variant not found`
+            );
+        }
+
+        // Check if variant is active
+        if (!variant.isActive) {
+            throw new BadRequestException(
+                `Product "${variant.product.name}" is no longer available`
+            );
+        }
+
+        if (!variant.inventory) {
+            this.logger.error(`Variant ${id} has no inventory record`, '', ProductVariantService.name);
+            throw new BadRequestException(
+                `Product inventory not found for variant ${id}`
+            );
+        }
+
+        return variant;
+    }
+
+    async updateInventory(variantId: string, operation: 'increment' | 'decrement', quantity: number = 1): Promise<void> {
+        const inventory = await this.prisma.variantInventory.findUnique({
+            where: { variantId },
+            select: { id: true, stockOnHand: true },
+        });
+
+        if (!inventory) {
+            this.logger.error(`Variant ${variantId} has no inventory record`, '', ProductVariantService.name);
+            throw new BadRequestException(`Variant inventory not found for ${variantId}`);
+        }
+
+        // Atomic update with concurrency control
+        if (operation === 'decrement') {
+            // Prevent negative stock - this is atomic and prevents race conditions
+            const result = await this.prisma.variantInventory.updateMany({
+                where: {
+                    id: inventory.id,
+                    stockOnHand: { gte: quantity } // Only update if enough stock
+                },
+                data: {
+                    stockOnHand: {
+                        decrement: quantity
+                    }
+                }
+            });
+
+            // If no rows were updated, stock was insufficient
+            if (result.count === 0) {
+                throw new BadRequestException(`Insufficient stock. Cannot reduce inventory by ${quantity}.`);
+            }
+        } else {
+            // Increment is safe - no race condition concern
+            await this.prisma.variantInventory.update({
+                where: { id: inventory.id },
+                data: {
+                    stockOnHand: {
+                        increment: quantity
+                    }
+                }
+            });
+        }
     }
 }
