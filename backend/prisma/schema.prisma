@@ -87,13 +87,11 @@ model VariantPrice {
 
 model VariantInventory {
   id          String         @id @default(uuid()) @db.Uuid
-  variantId   String         @db.Uuid
+  variantId   String         @unique @db.Uuid
   variant     ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
   stockOnHand Int
   lowStockThreshold Int? @default(10)
   updatedAt   DateTime @updatedAt
-
-  @@unique([variantId])
 }
 
 model ProductImage {
@@ -307,7 +305,7 @@ model Payment {
   amount      Decimal       @db.Decimal(10, 2)
   currency    String
   status      PAYMENTSTATUS
-  method      String
+  method      PAYMENTMETHOD
   capturedAt  DateTime?
   updatedAt   DateTime      @updatedAt
 
@@ -415,6 +413,12 @@ enum REASON {
   LOST
   WRONG_ITEM
   OTHER
+}
+
+enum PAYMENTMETHOD {
+  CARD
+  WALLET
+  CASH_ON_DELIVERY
 }
 
 // model Webhook {

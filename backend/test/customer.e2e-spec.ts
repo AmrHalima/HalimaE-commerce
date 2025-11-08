@@ -116,7 +116,7 @@ describe('CustomerController (e2e)', () => {
     describe('GET /customers', () => {
         it('should get all customers for admin', async () => {
             const response = await request(app.getHttpServer())
-                .get('/api/customers')
+                .get('/api/customers/admin/all')
                 .set('Authorization', `Bearer ${adminToken}`);
 
             const data = expectSuccessResponse<any>(response, 200);
@@ -125,7 +125,7 @@ describe('CustomerController (e2e)', () => {
 
         it('should not get all customers for customer', async () => {
             const response = await request(app.getHttpServer())
-                .get('/api/customers')
+                .get('/api/customers/admin/all')
                 .set('Authorization', `Bearer ${customerToken}`);
                 
             expectErrorResponse(response, 401); // or 403 depending on guard implementation, JwtUserGuard will fail validation -> 401
@@ -133,7 +133,7 @@ describe('CustomerController (e2e)', () => {
 
         it('should get all customers with pagination', async () => {
             const response = await request(app.getHttpServer())
-                .get('/api/customers?page=1&limit=10')
+                .get('/api/customers/admin/all?page=1&limit=10')
                 .set('Authorization', `Bearer ${adminToken}`);
                 
             const data = expectSuccessResponse<any>(response, 200);
@@ -144,7 +144,7 @@ describe('CustomerController (e2e)', () => {
 
         it('should get all customers with search', async () => {
             const response = await request(app.getHttpServer())
-                .get('/api/customers?search=test')
+                .get('/api/customers/admin/all?search=test')
                 .set('Authorization', `Bearer ${adminToken}`);
                 
             const data = expectSuccessResponse<any>(response, 200);
@@ -155,7 +155,7 @@ describe('CustomerController (e2e)', () => {
 
         it('should get all customers with sort', async () => {
             const response = await request(app.getHttpServer())
-                .get('/api/customers?sort=name&order=desc')
+                .get('/api/customers/admin/all?sort=name&order=desc')
                 .set('Authorization', `Bearer ${adminToken}`);
 
             const data = expectSuccessResponse<any>(response, 200);

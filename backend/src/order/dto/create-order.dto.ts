@@ -1,5 +1,6 @@
 import { IsString, IsUUID, IsEnum, IsOptional } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
+import { PAYMENTMETHOD } from '@prisma/client';
 
 export class CreateOrderDto {
   @ApiProperty({
@@ -7,30 +8,29 @@ export class CreateOrderDto {
     example: '123e4567-e89b-12d3-a456-426614174000'
   })
   @IsUUID()
-  billingAddressId: string;
+  readonly billingAddressId: string;
 
   @ApiProperty({
     description: 'Shipping address ID',
     example: '123e4567-e89b-12d3-a456-426614174001'
   })
   @IsUUID()
-  shippingAddressId: string;
+  readonly shippingAddressId: string;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     description: 'Currency code (defaults to EGP)',
     example: 'EGP',
     default: 'EGP'
   })
   @IsOptional()
   @IsString()
-  currency?: string;
+  readonly currency: string;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     description: 'Payment method to use',
     example: 'CARD',
-    enum: ['CARD', 'CASH', 'WALLET']
+    enum: PAYMENTMETHOD,
   })
-  @IsOptional()
-  @IsEnum(['CARD', 'CASH', 'WALLET'])
-  paymentMethod?: string;
+  @IsEnum(PAYMENTMETHOD)
+  readonly paymentMethod: PAYMENTMETHOD;
 }

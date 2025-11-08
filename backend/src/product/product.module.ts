@@ -14,6 +14,6 @@ import { memoryStorage } from 'multer';
     ],
     controllers: [ProductController],
     providers: [ProductService, ProductVariantService, ProductImageService],
-    exports: [ProductService, ProductImageService],
+    exports: [ProductService, ProductImageService, ProductVariantService],
 })
 export class ProductModule {}

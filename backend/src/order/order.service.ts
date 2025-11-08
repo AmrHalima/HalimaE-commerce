@@ -6,7 +6,8 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { LogService } from '../logger/log.service';
 import { CartService } from '../cart/cart.service';
-import { ORDERSTATUS, PAYMENTSTATUS, FULFILLMENTSTATUS, Prisma } from '@prisma/client';
+import { PaymentService } from '../payment/payment.service';
+import { ORDERSTATUS, PAYMENTSTATUS, FULFILLMENTSTATUS, PAYMENTMETHOD, Prisma } from '@prisma/client';
 import { 
     CreateOrderDto, 
     FilterOrderDto,
@@ -16,24 +17,28 @@ import {
     ResponseOrderDto,
     ResponseOrdersFilteredDto 
 } from './dto';
+import { ProductVariantService } from '../product/product-variant.service';
 
 @Injectable()
 export class OrderService {
     constructor(
         private readonly prisma: PrismaService,
+        private readonly productVariantService: ProductVariantService,
         private readonly logger: LogService,
         private readonly cartService: CartService,
+        private readonly paymentService: PaymentService,
     ) { }
 
     /**
      * Generate unique order number
      * Format: ORD-YYYY-XXXXXX (e.g., ORD-2025-000001)
+     * Optimized: Only selects orderNo field
      */
     private async generateOrderNumber(): Promise<string> {
         const year = new Date().getFullYear();
         const prefix = `ORD-${year}-`;
         
-        // Get the latest order for this year
+        // Get the latest order for this year - Only select orderNo for optimization
         const latestOrder = await this.prisma.order.findFirst({
             where: {
                 orderNo: {
@@ -42,7 +47,8 @@ export class OrderService {
             },
             orderBy: {
                 orderNo: 'desc'
-            }
+            },
+            select: { orderNo: true }
         });
 
         let nextNumber = 1;
@@ -59,29 +65,16 @@ export class OrderService {
      * Converts cart items to order items with snapshots for historical data
      */
     async createOrder(customerId: string, createOrderDto: CreateOrderDto): Promise<ResponseOrderDto> {
-        this.logger.debug(`Creating order for customer: ${customerId}`, 'OrderService');
+        this.logger.debug(`Creating order for customer: ${customerId}`, OrderService.name);
 
         try {
             return await this.prisma.$transaction(async (prisma) => {
                 // 1. Verify addresses belong to customer
-                const [billingAddress, shippingAddress] = await Promise.all([
-                    prisma.address.findUnique({
-                        where: { 
-                            id: createOrderDto.billingAddressId,
-                            customerId 
-                        }
-                    }),
-                    prisma.address.findUnique({
-                        where: { 
-                            id: createOrderDto.shippingAddressId,
-                            customerId 
-                        }
-                    })
-                ]);
-
-                if (!billingAddress || !shippingAddress) {
-                    throw new BadRequestException('Invalid address');
-                }
+                await this.verifyAddresses(
+                    createOrderDto.billingAddressId,
+                    createOrderDto.shippingAddressId,
+                    customerId
+                );                
 
                 // 2. Get cart for checkout (lightweight)
                 const cart = await this.cartService.getCartForCheckout(customerId);
@@ -98,42 +91,17 @@ export class OrderService {
 
                 for (const item of cart.items) {
                     // Fetch full variant with product and inventory
-                    const variant = await prisma.productVariant.findUnique({
-                        where: { id: item.variant.id },
-                        select: {
-                            id: true,
-                            isActive: true,
-                            sku: true,
-                            product: {
-                                select: {
-                                    name: true
-                                }
-                            },
-                            inventory: { select: { stockOnHand: true } }
-                        }
-                    });
+                    const variant = (await this.productVariantService.getVariantById(item.variant.id))!;
 
-                    if (!variant) {
+                    // Early check for better UX (the atomic update will be the final guard)
+                    // This prevents unnecessary order creation if stock is insufficient
+                    if (variant.inventory!.stockOnHand < item.qty) {
                         throw new BadRequestException(
-                            `Product variant not found`
+                            `Insufficient stock for "${variant.product.name}". Only ${variant.inventory!.stockOnHand} available`
                         );
                     }
 
-                    // Check if variant is active
-                    if (!variant.isActive) {
-                        throw new BadRequestException(
-                            `Product "${variant.product.name}" is no longer available`
-                        );
-                    }
-
-                    // Check inventory
-                    if (variant.inventory && variant.inventory.stockOnHand < item.qty) {
-                        throw new BadRequestException(
-                            `Insufficient stock for "${variant.product.name}". Only ${variant.inventory.stockOnHand} available`
-                        );
-                    }
-
-                    // Get price for currency from cart item (already has prices)
+                    // Get price for currency from cart item
                     const price = item.variant.prices.find(p => p.currency === currency);
                     if (!price) {
                         throw new BadRequestException(
@@ -191,23 +159,39 @@ export class OrderService {
                     }
                 });
 
-                // 6. Update inventory (reserve stock)
-                for (const item of orderItems) {
-                    const inventory = await prisma.variantInventory.findUnique({
-                        where: { variantId: item.variantId },
-                        select: { id: true },
+                // Calculate totals
+                const total = subtotal; // TODO: Add shipping, tax, etc
+
+                // Create payment intent for non-cash orders
+                let paymentUrl: string | null = null;
+                if (createOrderDto.paymentMethod !== PAYMENTMETHOD.CASH_ON_DELIVERY) {
+                    paymentUrl = await this.paymentService.createPaymentIntent({
+                        orderId: order.id,
+                        amount: Number(total),
+                        currency,
+                        method: createOrderDto.paymentMethod,
+                        billing_address: order.billingAddress ? {
+                            id: order.billingAddress.id,
+                            firstName: order.billingAddress.firstName,
+                            lastName: order.billingAddress.lastName,
+                            phone: order.billingAddress.phone || '',
+                            line1: order.billingAddress.line1,
+                            line2: order.billingAddress.line2 || undefined,
+                            city: order.billingAddress.city,
+                            country: order.billingAddress.country,
+                            postalCode: order.billingAddress.postalCode,
+                        } : undefined
                     });
 
-                    if (inventory) {
-                        await prisma.variantInventory.update({
-                            where: { variantId: item.variantId },
-                            data: {
-                                stockOnHand: {
-                                    decrement: item.qty
-                                }
-                            }
-                        });
-                    }
+                    this.logger.log(
+                        `Payment URL created for order ${orderNo}`,
+                        OrderService.name
+                    );
+                }
+
+                // 6. Update inventory
+                for (const item of orderItems) {
+                    await this.productVariantService.updateInventory(item.variantId, 'decrement', item.qty);
                 }
 
                 // 7. Clear cart using cart service
@@ -215,23 +199,21 @@ export class OrderService {
 
                 this.logger.log(
                     `Order ${orderNo} created successfully for customer ${customerId}`,
-                    'OrderService'
+                    OrderService.name
                 );
-
-                // Calculate totals
-                const total = subtotal; // TODO: Add shipping, tax, etc
 
                 return {
                     ...order,
                     subtotal,
-                    total
+                    total,
+                    paymentUrl, // Payment URL for card/wallet, null for cash
                 } as ResponseOrderDto;
             });
         } catch (error) {
             this.logger.error(
                 `Failed to create order for customer ${customerId}`,
                 error.stack,
-                'OrderService'
+                OrderService.name
             );
             throw error;
         }
@@ -244,7 +226,7 @@ export class OrderService {
         customerId: string, 
         filterDto: FilterOrderDto
     ): Promise<ResponseOrdersFilteredDto> {
-        const { page = 1, limit = 10, status, paymentStatus, fulfillmentStatus, orderNo } = filterDto;
+        const { page = 1, limit = 10, status, paymentStatus, fulfillmentStatus, orderNo, sortOrder, orderBy } = filterDto;
         const skip = (page - 1) * limit;
 
         const where: any = { customerId };
@@ -311,7 +293,7 @@ export class OrderService {
                     }
                 },
                 orderBy: {
-                    placedAt: 'desc'
+                    [orderBy || 'placedAt']: sortOrder || 'desc'
                 },
                 skip,
                 take: limit
@@ -697,7 +679,7 @@ export class OrderService {
 
         this.logger.log(
             `Order ${updatedOrder.orderNo} status updated to ${updateDto.status}`,
-            'OrderService'
+            OrderService.name
         );
 
         const subtotal = updatedOrder.items.reduce(
@@ -791,7 +773,7 @@ export class OrderService {
 
         this.logger.log(
             `Order ${updatedOrder.orderNo} payment status updated to ${updateDto.paymentStatus}`,
-            'OrderService'
+            OrderService.name
         );
 
         const subtotal = updatedOrder.items.reduce(
@@ -890,7 +872,7 @@ export class OrderService {
 
         this.logger.log(
             `Order ${updatedOrder.orderNo} fulfillment status updated to ${updateDto.fulfillmentStatus}`,
-            'OrderService'
+            OrderService.name
         );
 
         const subtotal = updatedOrder.items.reduce(
@@ -907,6 +889,7 @@ export class OrderService {
 
     /**
      * Cancel order (customer can cancel if status is PENDING or PROCESSING)
+     * Optimized: Only selects fields needed for validation and inventory restoration
      */
     async cancelOrder(orderId: string, customerId: string): Promise<ResponseOrderDto> {
         const order = await this.prisma.order.findUnique({
@@ -914,12 +897,21 @@ export class OrderService {
                 id: orderId,
                 customerId 
             },
-            include: {
+            select: {
+                id: true,
+                orderNo: true,
+                status: true,
                 items: {
-                    include: {
+                    select: {
+                        variantId: true,
+                        qty: true,
                         variant: {
-                            include: {
-                                inventory: true
+                            select: {
+                                inventory: {
+                                    select: {
+                                        id: true // Only select id to check if inventory exists
+                                    }
+                                }
                             }
                         }
                     }
@@ -941,16 +933,19 @@ export class OrderService {
         // Restore inventory
         await this.prisma.$transaction(async (prisma) => {
             for (const item of order.items) {
-                if (item.variant.inventory) {
-                    await prisma.variantInventory.update({
-                        where: { variantId: item.variantId },
-                        data: {
-                            stockOnHand: {
-                                increment: item.qty
-                            }
-                        }
-                    });
+                if (!item.variant.inventory) {
+                    this.logger.error(`Variant ${item.variantId} has no inventory record`, '', 'OrderService');
+                    throw new BadRequestException(`Variant inventory not found for ${item.variantId}`);
                 }
+
+                await prisma.variantInventory.update({
+                    where: { variantId: item.variantId },
+                    data: {
+                        stockOnHand: {
+                            increment: item.qty
+                        }
+                    }
+                });
             }
 
             await prisma.order.update({
@@ -964,9 +959,36 @@ export class OrderService {
 
         this.logger.log(
             `Order ${order.orderNo} cancelled by customer ${customerId}`,
-            'OrderService'
+            OrderService.name
         );
 
         return this.getOrderById(orderId, customerId);
+    }
+
+    /**
+     * Verify addresses belong to customer
+     * Optimized: Only selects id field for validation
+     */
+    private async verifyAddresses(billingAddressId: string, shippingAddressId: string, customerId: string): Promise<void> {
+        const [billingAddress, shippingAddress] = await Promise.all([
+            this.prisma.address.findUnique({
+                where: {
+                    id: billingAddressId,
+                    customerId
+                },
+                select: { id: true } // Only select id for validation
+            }),
+            this.prisma.address.findUnique({
+                where: {
+                    id: shippingAddressId,
+                    customerId
+                },
+                select: { id: true } // Only select id for validation
+            })
+        ]);
+
+        if (!billingAddress || !shippingAddress) {
+            throw new BadRequestException('Invalid address');
+        }
     }
 }

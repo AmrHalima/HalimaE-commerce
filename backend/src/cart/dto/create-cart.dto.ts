@@ -35,6 +35,6 @@ export class UpdateCartItemDto {
         minimum: 0
     })
     @IsInt()
-    @Min(0) // Allow 0 to remove item
+    @Min(0)
     qty: number;
 }

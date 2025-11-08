@@ -35,7 +35,12 @@ export class CartService {
                 items: {
                     include: {
                         variant: {
-                            include: {
+                            select: {
+                                id: true,
+                                sku: true,
+                                size: true,
+                                color: true,
+                                material: true,
                                 product: {
                                     select: {
                                         id: true,
@@ -75,7 +80,6 @@ export class CartService {
         } as CartResponseDto;
     }
 
-    // Lightweight cart for checkout - YOUR SMART APPROACH!
     async getCartForCheckout(customerId: string): Promise<CheckoutCartDto | null> {
         const cart = await this.prismaService.cart.findFirst({
             where: { customerId },
@@ -86,6 +90,9 @@ export class CartService {
                             select: {
                                 id: true,
                                 sku: true,
+                                size: true,
+                                color: true,
+                                material: true,
                                 product: {
                                     select: {
                                         name: true,
@@ -114,7 +121,6 @@ export class CartService {
         } as CheckoutCartDto;
     }
 
-    // Get cart items count only (for header badges)
     async getCartItemsCount(customerId: string): Promise<number> {
         const result = await this.prismaService.cartItem.aggregate({
             where: {
@@ -146,22 +152,25 @@ export class CartService {
                     throw new BadRequestException('Product variant is not available');
                 }
 
-                if (variant.inventory) {
-                    const currentCartItem = await prisma.cartItem.findFirst({
-                        where: {
-                            cart: { customerId },
-                            variantId: addToCartDto.variantId
-                        }
-                    });
-                    
-                    const currentQty = currentCartItem?.qty || 0;
-                    const newTotalQty = currentQty + addToCartDto.qty;
-                    
-                    if (variant.inventory.stockOnHand < newTotalQty) {
-                        throw new BadRequestException(
-                            `Only ${variant.inventory.stockOnHand} units available`
-                        );
+                if (!variant.inventory) {
+                    this.logger.error(`Variant ${addToCartDto.variantId} has no inventory record`, '', 'CartService');
+                    throw new BadRequestException('Product inventory not found');
+                }
+
+                const currentCartItem = await prisma.cartItem.findFirst({
+                    where: {
+                        cart: { customerId },
+                        variantId: addToCartDto.variantId
                     }
+                });
+
+                const currentQty = currentCartItem?.qty || 0;
+                const newTotalQty = currentQty + addToCartDto.qty;
+
+                if (variant.inventory.stockOnHand < newTotalQty) {
+                    throw new BadRequestException(
+                        `Only ${variant.inventory.stockOnHand} units available`
+                    );
                 }
 
                 let cart = await prisma.cart.findFirst({
@@ -174,12 +183,11 @@ export class CartService {
                     });
                 }
 
-                // Get existing item to check current quantity
                 const existingItem = await prisma.cartItem.findFirst({
                     where: {
                         cartId: cart.id,
                         variantId: addToCartDto.variantId
-                    }
+                    }, select: { id: true }
                 });
 
                 if (existingItem) {
@@ -218,6 +226,13 @@ export class CartService {
                 cart: {
                     customerId
                 }
+            },
+            include: {
+                variant: {
+                    include: {
+                        inventory: { select: { stockOnHand: true } }
+                    }
+                }
             }
         });
 
@@ -225,9 +240,23 @@ export class CartService {
             throw new NotFoundException('Cart item not found');
         }
 
-        // If quantity is 0, remove item
+        if (!cartItem.variant.inventory) {
+            this.logger.error(`Variant ${cartItem.variantId} has no inventory record`, '', 'CartService');
+            throw new BadRequestException('Product inventory not found');
+        }
+
         if (updateCartItemDto.qty === 0) {
             return this.removeFromCart(customerId, itemId);
+        }
+
+        if (updateCartItemDto.qty < 0) {
+            throw new BadRequestException('Quantity must be positive');
+        }
+
+        if (updateCartItemDto.qty > cartItem.variant.inventory.stockOnHand) {
+            throw new BadRequestException(
+                `Only ${cartItem.variant.inventory.stockOnHand} units available`
+            );
         }
 
         return this.prismaService.cartItem.update({
@@ -290,22 +319,19 @@ export class CartService {
             
             if (price) {
                 const amount = Number(price.amount);
-                
-                // Validate price is positive
+
                 if (amount < 0) {
                     this.logger.error(`Invalid negative price detected for variant ${item.variant.id}`, '', 'CartService');
                     throw new BadRequestException('Invalid price detected');
                 }
-                
-                // Validate quantity is positive
+
                 if (item.qty < 0) {
                     this.logger.error(`Invalid negative quantity detected for cart item`, '', 'CartService');
                     throw new BadRequestException('Invalid quantity detected');
                 }
                 
                 const itemTotal = amount * item.qty;
-                
-                // Check for overflow or invalid numbers
+
                 if (!Number.isFinite(itemTotal)) {
                     this.logger.error(`Price calculation overflow for variant ${item.variant.id}`, '', 'CartService');
                     throw new BadRequestException('Price calculation error');
@@ -323,7 +349,6 @@ export class CartService {
             }
         });
 
-        // Final validation
         if (total < 0 || !Number.isFinite(total)) {
             this.logger.error(`Invalid cart total calculated: ${total}`, '', 'CartService');
             throw new BadRequestException('Cart total calculation error');

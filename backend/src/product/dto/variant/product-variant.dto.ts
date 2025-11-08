@@ -76,16 +76,13 @@ export class ProductVariantDto {
     readonly prices: VariantPriceDto[];
 
     @ApiProperty({
-        description: 'Inventory information for this variant',
+        description: 'Inventory information for this variant (required)',
         type: () => VariantInventoryDto,
         example: {
             stockOnHand: 100
-        },
-        required: false,
-        nullable: true
+        }
     })
-    @IsOptional()
     @ValidateNested()
     @Type(() => VariantInventoryDto)
-    readonly inventory?: VariantInventoryDto | null;
+    readonly inventory: VariantInventoryDto;
 }
