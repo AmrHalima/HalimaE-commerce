@@ -4,7 +4,7 @@ import { setupE2ETest, teardownE2ETest, getUniqueTestData } from './jest-e2e.set
 import * as argon2 from 'argon2';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { LogService } from '../src/logger/log.service';
-import { Status, ORDERSTATUS, PAYMENTSTATUS, FULFILLMENTSTATUS } from '@prisma/client';
+import { Status, ORDERSTATUS, PAYMENTSTATUS, FULFILLMENTSTATUS, PAYMENTMETHOD } from '@prisma/client';
 import { 
     expectSuccessResponse, 
     expectErrorResponse, 
@@ -180,14 +180,15 @@ describe('OrderController (e2e)', () => {
     });
 
     describe('POST /orders (Create Order)', () => {
-        it('should create an order from customer cart', async () => {
+        it('should create an order from customer cart with payment method', async () => {
             const response = await request(app.getHttpServer())
-                .post('/api/orders')
+                .post('/api/orders/checkout')
                 .set('Authorization', `Bearer ${customerToken}`)
                 .send({
                     billingAddressId: billingAddressId,
                     shippingAddressId: shippingAddressId,
                     currency: 'EGP',
+                    paymentMethod: PAYMENTMETHOD.CASH_ON_DELIVERY, // Use cash for testing
                 });
 
             expect(response.status).toBe(201);
@@ -206,6 +207,9 @@ describe('OrderController (e2e)', () => {
             expect(data.subtotal).toBe(200);
             expect(data.total).toBe(200);
             
+            // For cash on delivery, paymentUrl should be null
+            expect(data.paymentUrl).toBeNull();
+
             // Verify billing address snapshot
             expect(data.billingAddress).toHaveProperty('firstName', 'John');
             expect(data.billingAddress).toHaveProperty('lastName', 'Doe');
@@ -246,11 +250,12 @@ describe('OrderController (e2e)', () => {
 
         it('should return 400 if customer cart is empty', async () => {
             const response = await request(app.getHttpServer())
-                .post('/api/orders')
+                .post('/api/orders/checkout')
                 .set('Authorization', `Bearer ${customerToken}`)
                 .send({
                     billingAddressId: billingAddressId,
                     shippingAddressId: shippingAddressId,
+                    paymentMethod: PAYMENTMETHOD.CASH_ON_DELIVERY,
                 });
 
             expectErrorResponse(response, 400);
@@ -303,11 +308,12 @@ describe('OrderController (e2e)', () => {
             });
 
             const response = await request(app.getHttpServer())
-                .post('/api/orders')
+                .post('/api/orders/checkout')
                 .set('Authorization', `Bearer ${customerToken}`)
                 .send({
                     billingAddressId: otherAddress.id, // Wrong customer's address
                     shippingAddressId: shippingAddressId,
+                    paymentMethod: PAYMENTMETHOD.CASH_ON_DELIVERY,
                 });
 
             expectErrorResponse(response, 400);
@@ -315,10 +321,11 @@ describe('OrderController (e2e)', () => {
 
         it('should return 401 if not authenticated', async () => {
             const response = await request(app.getHttpServer())
-                .post('/api/orders')
+                .post('/api/orders/checkout')
                 .send({
                     billingAddressId: billingAddressId,
                     shippingAddressId: shippingAddressId,
+                    paymentMethod: PAYMENTMETHOD.CASH_ON_DELIVERY,
                 });
 
             expectErrorResponse(response, 401);
@@ -449,15 +456,16 @@ describe('OrderController (e2e)', () => {
                 },
             });
 
-            const response = await request(app.getHttpServer())
-                .post('/api/orders')
+            const createResponse = await request(app.getHttpServer())
+                .post('/api/orders/checkout')
                 .set('Authorization', `Bearer ${customerToken}`)
                 .send({
                     billingAddressId: billingAddressId,
                     shippingAddressId: shippingAddressId,
+                    paymentMethod: PAYMENTMETHOD.CASH_ON_DELIVERY,
                 });
 
-            const data = expectSuccessResponse<any>(response, 201);
+            const data = expectSuccessResponse<any>(createResponse, 201);
             cancelableOrderId = data.id;
         });
 
@@ -751,12 +759,13 @@ describe('OrderController (e2e)', () => {
 
             // 2. Create order
             const createResponse = await request(app.getHttpServer())
-                .post('/api/orders')
+                .post('/api/orders/checkout')
                 .set('Authorization', `Bearer ${customerToken}`)
                 .send({
                     billingAddressId: billingAddressId,
                     shippingAddressId: shippingAddressId,
                     currency: 'EGP',
+                    paymentMethod: PAYMENTMETHOD.CASH_ON_DELIVERY,
                 });
 
             if (createResponse.status !== 201) {
@@ -809,14 +818,14 @@ describe('OrderController (e2e)', () => {
             const deliveredOrder = expectSuccessResponse<any>(deliveredResponse, 200);
             expect(deliveredOrder.fulfillmentStatus).toBe(FULFILLMENTSTATUS.DELIVERED);
 
-            // 7. Order status is marked as DELIVERED (final order status)
-            const finalStatusResponse = await request(app.getHttpServer())
-                .patch(`/api/orders/admin/${order.id}/status`)
-                .set('Authorization', `Bearer ${adminToken}`)
-                .send({ status: ORDERSTATUS.DELIVERED });
+            // 7. Verify order status was automatically updated to DELIVERED
+            // (Order status is automatically updated when fulfillment status is set to DELIVERED)
+            const verifyResponse = await request(app.getHttpServer())
+                .get(`/api/orders/admin/${order.id}`)
+                .set('Authorization', `Bearer ${adminToken}`);
 
-            const finalOrder = expectSuccessResponse<any>(finalStatusResponse, 200);
-            expect(finalOrder.status).toBe(ORDERSTATUS.DELIVERED);
+            const verifiedOrder = expectSuccessResponse<any>(verifyResponse, 200);
+            expect(verifiedOrder.status).toBe(ORDERSTATUS.DELIVERED);
 
             // 8. Customer retrieves delivered order
             const customerOrderResponse = await request(app.getHttpServer())
@@ -863,11 +872,12 @@ describe('OrderController (e2e)', () => {
             });
 
             const createResponse = await request(app.getHttpServer())
-                .post('/api/orders')
+                .post('/api/orders/checkout')
                 .set('Authorization', `Bearer ${customerToken}`)
                 .send({
                     billingAddressId: billingAddressId,
                     shippingAddressId: shippingAddressId,
+                    paymentMethod: PAYMENTMETHOD.CASH_ON_DELIVERY,
                 });
 
             const order = expectSuccessResponse<any>(createResponse, 201);
@@ -926,11 +936,12 @@ describe('OrderController (e2e)', () => {
             });
 
             const response = await request(app.getHttpServer())
-                .post('/api/orders')
+                .post('/api/orders/checkout')
                 .set('Authorization', `Bearer ${customerToken}`)
                 .send({
                     billingAddressId: billingAddressId,
                     shippingAddressId: shippingAddressId,
+                    paymentMethod: PAYMENTMETHOD.CASH_ON_DELIVERY,
                 });
 
             expectErrorResponse(response, 400);
@@ -967,17 +978,17 @@ describe('OrderController (e2e)', () => {
 
         it('should not allow unauthenticated access to any order endpoint', async () => {
             const endpoints = [
-                { method: 'post', url: '/api/orders' },
-                { method: 'get', url: '/api/orders/my-orders' },
-                { method: 'get', url: `/api/orders/my-orders/${orderId}` },
-                { method: 'get', url: '/api/orders/admin/all' },
+                { method: 'post', url: '/api/orders/checkout', expectedStatus: 401 },
+                { method: 'get', url: '/api/orders/my-orders', expectedStatus: 401 },
+                { method: 'get', url: `/api/orders/my-orders/${orderId}`, expectedStatus: 401 },
+                { method: 'get', url: '/api/orders/admin/all', expectedStatus: 401 },
             ];
 
             for (const endpoint of endpoints) {
                 const response = await (request(app.getHttpServer()) as any)
                     [endpoint.method](endpoint.url);
 
-                expectErrorResponse(response, 401);
+                expectErrorResponse(response, endpoint.expectedStatus);
             }
         });
     });

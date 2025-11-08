@@ -179,6 +179,16 @@ describe('ProductController (e2e)', () => {
             expect(data.products).toBeInstanceOf(Array);
             expect(data.products.length).toBeGreaterThan(0);
             expect(data.meta).toBeDefined();
+            // Verify variants contain all necessary fields
+            const product = data.products[0];
+            expect(product.variants).toBeInstanceOf(Array);
+            if (product.variants.length > 0) {
+                const variant = product.variants[0];
+                expect(variant).toHaveProperty('sku');
+                expect(variant).toHaveProperty('size');
+                expect(variant).toHaveProperty('color');
+                expect(variant).toHaveProperty('material');
+            }
         });
 
         it('should filter products by categoryId', async () => {
@@ -229,6 +239,17 @@ describe('ProductController (e2e)', () => {
                     const data = expectSuccessResponse<any>(res, 200);
                     expect(data.id).toBe(productId);
                     expect(data.name).toBe('E2E Test T-Shirt');
+                    expect(data.variants).toBeInstanceOf(Array);
+                    expect(data.variants.length).toBeGreaterThan(0);
+                    // Verify variant fields are present
+                    const variant = data.variants[0];
+                    expect(variant).toHaveProperty('id');
+                    expect(variant).toHaveProperty('sku');
+                    expect(variant).toHaveProperty('size');
+                    expect(variant).toHaveProperty('color');
+                    expect(variant).toHaveProperty('material');
+                    expect(variant).toHaveProperty('prices');
+                    expect(variant).toHaveProperty('inventory');
                 });
         });
 
@@ -249,7 +270,17 @@ describe('ProductController (e2e)', () => {
                 .expect(200)
                 .expect(res => {
                     const data = expectSuccessArrayResponse<any>(res, 200);
-                    expect(data[0].id).toBe(variantId);
+                    const variant = data[0];
+                    expect(variant.id).toBe(variantId);
+                    expect(variant).toHaveProperty('sku');
+                    expect(variant).toHaveProperty('size');
+                    expect(variant).toHaveProperty('color');
+                    expect(variant).toHaveProperty('material');
+                    expect(variant).toHaveProperty('isActive');
+                    expect(variant).toHaveProperty('prices');
+                    expect(variant.prices).toBeInstanceOf(Array);
+                    expect(variant).toHaveProperty('inventory');
+                    expect(variant.inventory).toHaveProperty('stockOnHand');
                 });
         });
     });
@@ -287,6 +318,7 @@ describe('ProductController (e2e)', () => {
                 color: 'Blue',
                 size: 'M',
                 prices: [{ currency: 'EGP', amount: new Prisma.Decimal('24.99') }],
+                inventory: { stockOnHand: 50 },
             };
 
             const response = await request(app.getHttpServer())
@@ -297,6 +329,31 @@ describe('ProductController (e2e)', () => {
 
             const data = expectSuccessResponse<any>(response, 201);
             expect(data.sku).toBe(newVariant.sku);
+            expect(data.size).toBe(newVariant.size);
+            expect(data.color).toBe(newVariant.color);
+            expect(data).toHaveProperty('material');
+            expect(data.inventory).toBeDefined();
+            expect(data.inventory.stockOnHand).toBe(50);
+        });
+
+        it('should reject creating variant without inventory', async () => {
+            const invalidVariant: any = {
+                sku: 'E2E-TSHIRT-GREEN-S',
+                color: 'Green',
+                size: 'S',
+                prices: [{ currency: 'EGP', amount: new Prisma.Decimal('22.99') }],
+                // Missing inventory - should fail
+            };
+
+            const response = await request(app.getHttpServer())
+                .post(`/api/products/${productId}/variants`)
+                .set('Authorization', `Bearer ${authToken}`)
+                .send(invalidVariant)
+                .expect(400);
+
+            expectErrorResponse(response, 400);
+            const errorMessage = response.body.message || response.body.error?.message || '';
+            expect(errorMessage).toContain('inventory');
         });
     });
 
@@ -344,7 +401,13 @@ describe('ProductController (e2e)', () => {
                     status: 'ACTIVE',
                     categoryId: categoryId,
                     description: 'This product will be deleted.',
-                    variants: { create: { sku: 'DEL-VAR', prices: { create: { currency: 'EGP', amount: 1 } } } },
+                    variants: {
+                        create: {
+                            sku: 'DEL-VAR',
+                            prices: { create: { currency: 'EGP', amount: 1 } },
+                            inventory: { create: { stockOnHand: 10 } }
+                        }
+                    },
                     images: { create: { url: '/del-img.png', sort: 1 } },
                 },
                 include: { variants: true, images: true },
