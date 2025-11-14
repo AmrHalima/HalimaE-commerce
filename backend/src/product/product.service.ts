@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProductImageService } from './product-image.service';
 import { ProductVariantService } from './product-variant.service';
@@ -14,6 +14,23 @@ export class ProductService {
         private readonly productImageService: ProductImageService,
         private readonly logger: LogService,
     ) { }
+
+    // Ensure all variants for a single product have inventory records
+    private isProductVariantsHaveInventory(product: any) {
+        const variantsWithoutInventory = product?.variants?.filter((v: any) => !v.inventory) || [];
+        if (variantsWithoutInventory.length > 0) {
+            const ids = variantsWithoutInventory.map((v: any) => v.id).join(', ');
+            this.logger.error(`Variants without inventory found: ${ids}`, ProductService.name);
+            throw new BadRequestException('Some variants are missing inventory data');
+        }
+    }
+
+    // Ensure all products' variants have inventory records
+    private isProductsVariantsHaveInventory(products: any[]) {
+        for (const p of products || []) {
+            this.isProductVariantsHaveInventory(p);
+        }
+    }
 
     async findAll(filters: FilterProductDto): Promise<ResponseProductFilteredDto> {
         const { name, categoryId, status, page = 1, priceMin = 0, priceMax } = filters;
@@ -81,10 +98,13 @@ export class ProductService {
             })
         ]);
 
+        // application-level requirement
+        this.isProductsVariantsHaveInventory(products);
+
         const totalPages = Math.ceil(totalProducts / itemsPerPage);
 
         return {
-            products,
+            products: products as unknown as ResponseProductDto[],
             meta: {
                 totalPages,
                 currentPage: page,
@@ -118,8 +138,9 @@ export class ProductService {
             this.logger.warn(`Product with ID ${id} not found.`, ProductService.name);
             throw new NotFoundException(`Product with ID ${id} not found.`);
         }
+        this.isProductVariantsHaveInventory(product);
 
-        return product;
+        return product as ResponseProductDto;
     }
 
     async create(createProductDto: CreateProductDto): Promise<ResponseProductDto | null> {
@@ -165,10 +186,15 @@ export class ProductService {
             });
 
             this.logger.log(`Successfully created product with ID: ${newProduct?.id}`, ProductService.name);
-            return newProduct;
+
+            if (newProduct) {
+                this.isProductVariantsHaveInventory(newProduct);
+            }
+
+            return newProduct as ResponseProductDto | null;
         } catch (error) {
             this.logger.error('Failed to create product.', error.stack, ProductService.name);
-            throw error; // Re-throw the error to be handled by NestJS exception filters
+            throw error;
         }
     }
 
@@ -176,7 +202,10 @@ export class ProductService {
         this.logger.debug(`Attempting to update product ${id} with DTO: ${JSON.stringify(updateProductDto)}`, ProductService.name);
         
         // Ensure product exists before updating
-        await this.findById(id);
+        if (!await this.findById(id)) {
+            this.logger.warn(`Update failed: Product with ID ${id} not found.`, ProductService.name);
+            throw new NotFoundException(`Product with ID ${id} not found.`);
+        }
 
         const updatedProduct = await this.prisma.product.update({
             where: { id: id },
@@ -201,7 +230,9 @@ export class ProductService {
         });
 
         this.logger.log(`Successfully updated product with ID: ${id}`, ProductService.name);
-        return updatedProduct;
+
+        this.isProductVariantsHaveInventory(updatedProduct);
+        return updatedProduct as ResponseProductDto;
     }
 
     async remove(id: string): Promise<void> {
