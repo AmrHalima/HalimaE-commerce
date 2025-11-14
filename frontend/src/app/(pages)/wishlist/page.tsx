@@ -1,7 +1,7 @@
 "use client";
 
-import AddToCart from "@/app/_Components/AddToCart/AddToCart";
 import Loading from "@/app/loading";
+import { Button } from "@/components/ui/button";
 import {
     Card,
     CardContent,
@@ -120,12 +120,16 @@ export default function WishList() {
                                         </div>
                                     </div>
 
-                                    {/* Price + AddToCart */}
+                                    {/* Price + View Product */}
                                     <div className="flex items-center justify-between mt-4">
                                         <span className="text-lg font-bold">
                                             {price} EGP
                                         </span>
-                                        <AddToCart productId={id} />
+                                        <Link href={`/products/${id}`}>
+                                            <Button size="sm">
+                                                View Product
+                                            </Button>
+                                        </Link>
                                     </div>
                                 </CardContent>
                             </Card>

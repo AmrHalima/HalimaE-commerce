@@ -59,7 +59,7 @@ export default function LoginForm() {
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
         setIsLoading(true);
-        await signIn("credentials", {
+        await signIn("customer-credentials", {
             email: values.email,
             password: values.password,
             redirect: true,

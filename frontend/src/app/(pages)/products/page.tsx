@@ -1,10 +1,24 @@
-import ProductList from "@/app/_Components/ProductList/ProductList";
-import React from "react";
+import { ProductsFeed } from "@/components/ProductsFeed.server";
+import WhatsAppButton from "@/components/WhatsAppButton";
 
-export default async function products() {
+interface ProductsPageProps {
+    searchParams: {
+        page?: string;
+        categoryId?: string;
+        status?: "ACTIVE" | "INACTIVE";
+        search?: string;
+        priceMin?: string;
+        priceMax?: string;
+    };
+}
+
+export default async function ProductsPage({
+    searchParams,
+}: ProductsPageProps) {
     return (
         <>
-            <ProductList pageNumber={1} />
+            <ProductsFeed searchParams={searchParams} />
+            <WhatsAppButton variant="floating" />
         </>
     );
 }

@@ -20,7 +20,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 
-// Define the schema with password confirmation
+// Define the schema with password confirmation and status
 const formSchema = z
     .object({
         name: z.string().min(2, "Name must be at least 2 characters."),
@@ -33,6 +33,7 @@ const formSchema = z
                 /^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/,
                 "Enter a valid phone number"
             ),
+        status: z.enum(["ACTIVE", "INACTIVE"]).default("ACTIVE"),
     })
     .refine((data) => data.password === data.rePassword, {
         message: "Passwords do not match",
@@ -51,6 +52,8 @@ export default function RegisterForm() {
             email: "",
             password: "",
             rePassword: "",
+            phone: "",
+            status: "ACTIVE",
         },
     });
 
@@ -59,7 +62,7 @@ export default function RegisterForm() {
         setApiError(null);
         try {
             const res = await fetch(
-                "https://ecommerce.routemisr.com/api/v1/auth/signup",
+                `${process.env.NEXT_PUBLIC_BE_BASE_URL}/api/customers/auth/signup`,
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -67,8 +70,8 @@ export default function RegisterForm() {
                         name: values.name,
                         email: values.email,
                         password: values.password,
-                        rePassword: values.rePassword,
                         phone: values.phone,
+                        status: values.status,
                     }),
                 }
             );

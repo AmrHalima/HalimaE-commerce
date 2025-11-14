@@ -1,11 +1,6 @@
 "use client";
-import Wishlist from "@/interface/wishlist";
-import {
-    addToWishlist,
-    getWishList,
-    removeFromWishlist,
-} from "@/services/wishlistActions";
-import { useSession } from "next-auth/react";
+import Wishlist, { WishlistItem } from "@/interface/wishlist";
+import { getLowestPrice } from "@/lib/api";
 import React, {
     createContext,
     ReactNode,
@@ -21,7 +16,7 @@ export const WishListContext = createContext<{
     loading: boolean;
     itemCount: number;
     isItemInWishlist: (productId: string) => boolean;
-    addItem: (productId: string) => Promise<void>;
+    addItem: (productId: string, productData?: any) => Promise<void>;
     removeItem: (productId: string) => Promise<void>;
 }>({
     wishList: null,
@@ -32,6 +27,8 @@ export const WishListContext = createContext<{
     removeItem: async () => {},
 });
 
+const WISHLIST_STORAGE_KEY = "wishlist";
+
 export default function WishLIstContextProvider({
     children,
 }: {
@@ -39,52 +36,124 @@ export default function WishLIstContextProvider({
 }) {
     const [wishList, setWishList] = useState<Wishlist | null>(null);
     const [loading, setLoading] = useState(true);
-    const { status } = useSession();
 
-    // Fetch initial wishlist data
-    const fetchWishList = useCallback(async () => {
-        if (status === "authenticated") {
-            setLoading(true);
-            try {
-                const list = await getWishList();
-                setWishList(list);
-            } catch (error) {
-                if (error instanceof Error)
-                    toast.error("Failed to load wishlist: " + error.message);
-            } finally {
-                setLoading(false);
+    // Load wishlist from localStorage
+    const loadWishList = useCallback(() => {
+        try {
+            const stored = localStorage.getItem(WISHLIST_STORAGE_KEY);
+            if (stored) {
+                const parsed = JSON.parse(stored);
+                setWishList(parsed);
+            } else {
+                setWishList({ status: "success", count: 0, data: [] });
             }
-        } else {
-            // If not authenticated, clear the list
-            setWishList(null);
+        } catch (error) {
+            console.error("Failed to load wishlist from localStorage:", error);
+            setWishList({ status: "success", count: 0, data: [] });
+        } finally {
             setLoading(false);
         }
-    }, [status]);
+    }, []);
+
+    // Save wishlist to localStorage
+    const saveWishList = useCallback((list: Wishlist) => {
+        try {
+            localStorage.setItem(WISHLIST_STORAGE_KEY, JSON.stringify(list));
+        } catch (error) {
+            console.error("Failed to save wishlist to localStorage:", error);
+        }
+    }, []);
 
     useEffect(() => {
-        fetchWishList();
-    }, [fetchWishList]);
+        loadWishList();
+    }, [loadWishList]);
 
     // Function to add an item
-    const addItem = async (productId: string) => {
-        try {
-            const updatedWishlist = await addToWishlist(productId);
-            setWishList(updatedWishlist);
-            toast.success("Item added to wishlist!");
-        } catch (error) {
-            if (error instanceof Error) toast.error(error.message);
+    const addItem = async (productId: string, productData?: any) => {
+        if (!productData) {
+            toast.error("Product data is required to add to wishlist");
+            return;
         }
+
+        const currentList = wishList || {
+            status: "success",
+            count: 0,
+            data: [],
+        };
+        const isAlreadyInList = currentList.data.some(
+            (item) => item.id === productId
+        );
+
+        if (isAlreadyInList) {
+            toast.info("Item is already in wishlist");
+            return;
+        }
+
+        const lowestPrice = getLowestPrice(productData);
+
+        const newItem: WishlistItem = {
+            sold: 0,
+            images: productData.images?.map((img: any) => img.url) || [],
+            subcategory: [],
+            ratingsQuantity: 0,
+            _id: productId,
+            title: productData.name,
+            slug: productData.slug,
+            description: productData.description,
+            quantity:
+                productData.variants?.reduce(
+                    (sum: number, v: any) =>
+                        sum + (v.inventory?.stockOnHand || 0),
+                    0
+                ) || 0,
+            price: Number(lowestPrice?.amount) || 0,
+            imageCover: productData.images?.[0]?.url || "",
+            category: productData.category || {
+                id: "",
+                name: "",
+                slug: "",
+                parentId: null,
+                parent: null,
+            },
+            brand: { id: "", name: "", slug: "", parentId: null, parent: null },
+            ratingsAverage: 0,
+            createdAt: productData.createdAt,
+            updatedAt: productData.updatedAt,
+            __v: 0,
+            id: productId,
+        };
+
+        const updatedList = {
+            ...currentList,
+            data: [...currentList.data, newItem],
+            count: currentList.count + 1,
+        };
+
+        setWishList(updatedList);
+        saveWishList(updatedList);
+        toast.success("Item added to wishlist!");
     };
 
     // Function to remove an item
     const removeItem = async (productId: string) => {
-        try {
-            const updatedWishlist = await removeFromWishlist(productId);
-            setWishList(updatedWishlist);
-            toast.success("Item removed from wishlist.");
-        } catch (error) {
-            if (error instanceof Error) toast.error(error.message);
-        }
+        const currentList = wishList || {
+            status: "success",
+            count: 0,
+            data: [],
+        };
+        const updatedData = currentList.data.filter(
+            (item) => item.id !== productId
+        );
+
+        const updatedList = {
+            ...currentList,
+            data: updatedData,
+            count: updatedData.length,
+        };
+
+        setWishList(updatedList);
+        saveWishList(updatedList);
+        toast.success("Item removed from wishlist.");
     };
 
     // Helper to check if an item exists

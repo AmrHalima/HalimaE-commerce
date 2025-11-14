@@ -2,30 +2,28 @@
 import { cn } from "@/lib/utils";
 import { Heart } from "lucide-react";
 import React, { useState, useContext } from "react";
-import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
 import { WishListContext } from "@/context/WishLIstContext";
 
-export default function AddToWishList({ productId }: { productId: string }) {
+export default function AddToWishList({
+    productId,
+    product,
+}: {
+    productId: string;
+    product?: any;
+}) {
     const [isLoading, setIsLoading] = useState<boolean>(false);
-    const { status } = useSession();
-    const router = useRouter();
     const { addItem, removeItem, isItemInWishlist } =
         useContext(WishListContext);
 
     const isActive = isItemInWishlist(productId);
 
     async function toggle() {
-        if (status === "unauthenticated") {
-            router.push("/login");
-            return;
-        }
         setIsLoading(true);
         try {
             if (isActive) {
                 await removeItem(productId);
             } else {
-                await addItem(productId);
+                await addItem(productId, product);
             }
         } finally {
             setIsLoading(false);

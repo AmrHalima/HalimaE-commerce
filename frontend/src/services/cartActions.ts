@@ -1,150 +1,200 @@
 "use server";
 
-import { Cart } from "@/interface/cart";
-import { decode } from "next-auth/jwt";
-import { cookies } from "next/headers";
+import { Cart, CartResponse } from "@/interface/cart";
+import { getBackendAccessToken } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
-async function getAuthToken() {
-    const encToken = (await cookies()).get(`${process.env.TOKEN_NAME}`)?.value;
-    if (!encToken) return null;
-    return await decode({
-        token: encToken,
-        secret: process.env.NEXTAUTH_SECRET!,
-    });
-}
+const API_URL = process.env.NEXT_PUBLIC_BE_BASE_URL || "http://localhost:3000";
 
-// This is our source of truth for a fully populated cart.
+/**
+ * Get the current user's cart
+ * GET /api/cart
+ */
 export async function getCart(): Promise<Cart | null> {
-    const token = await getAuthToken();
+    const token = await getBackendAccessToken();
     if (!token) return null;
 
     try {
-        const res = await fetch(`${process.env.API_URL}/cart`, {
+        const res = await fetch(`${API_URL}/api/cart`, {
             method: "GET",
             headers: {
+                Authorization: `Bearer ${token}`,
                 "Content-Type": "application/json",
-                token: token.token as string,
             },
-            next: { tags: ["cart"] }, // Add tag for revalidation
+            cache: "no-store",
         });
 
         if (!res.ok) {
-            // The API might return 404 if the cart is empty, handle this gracefully
-            if (res.status === 404) {
-                return null;
-            }
+            // 404 means no cart exists yet
+            if (res.status === 404) return null;
             throw new Error(`Failed to fetch cart: ${res.statusText}`);
         }
 
-        const cart: Cart = await res.json();
-        return cart;
+        const response: CartResponse = await res.json();
+        return response.data;
     } catch (err) {
         console.error("getCart error:", err);
         return null;
     }
 }
 
-// All mutation functions will now call getCart() to return consistent data.
-export async function addToCart(productId?: string): Promise<Cart | null> {
-    const token = await getAuthToken();
+/**
+ * Add item to cart
+ * POST /api/cart/items
+ * Body: { variantId: string, qty: number }
+ */
+export async function addToCart(
+    variantId: string,
+    qty: number = 1
+): Promise<Cart | null> {
+    const token = await getBackendAccessToken();
     if (!token) throw new Error("Authentication required");
 
     try {
-        const res = await fetch(`${process.env.API_URL}/cart`, {
+        const res = await fetch(`${API_URL}/api/cart/items`, {
             method: "POST",
             headers: {
+                Authorization: `Bearer ${token}`,
                 "Content-Type": "application/json",
-                token: token.token as string,
             },
-            body: JSON.stringify({ productId }),
+            body: JSON.stringify({ variantId, qty }),
         });
 
         if (!res.ok) {
-            const errorData = await res.json();
-            throw new Error(errorData.message || "Failed to add to cart");
+            const errorData = await res.json().catch(() => ({}));
+            throw new Error(
+                errorData.message || `Failed to add to cart: ${res.statusText}`
+            );
         }
-        revalidatePath("/cart"); // Revalidate cart page
-        return await getCart(); // Return the populated cart
+
+        // Fetch the updated cart after adding
+        revalidatePath("/cart");
+        return await getCart();
     } catch (err) {
         console.error("addToCart error:", err);
         throw err;
     }
 }
 
-export async function removeCartItem(cartItemId: string): Promise<Cart | null> {
-    const token = await getAuthToken();
+/**
+ * Update cart item quantity
+ * PATCH /api/cart/items/:itemId
+ * Body: { qty: number }
+ */
+export async function updateCartItemQty(
+    itemId: string,
+    qty: number
+): Promise<Cart | null> {
+    const token = await getBackendAccessToken();
+    if (!token) throw new Error("Authentication required");
+
+    console.log("updateCartItemQty called with:", { itemId, qty });
+
+    try {
+        const url = `${API_URL}/api/cart/items/${itemId}`;
+        console.log("Making PATCH request to:", url);
+
+        const res = await fetch(url, {
+            method: "PATCH",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ qty }),
+        });
+
+        console.log("Response status:", res.status);
+
+        if (!res.ok) {
+            const errorData = await res.json().catch(() => ({}));
+            console.error("API Error:", errorData);
+            throw new Error(
+                errorData.message || `Failed to update item: ${res.statusText}`
+            );
+        }
+
+        const response = await res.json();
+        console.log("API Response:", response);
+
+        // The API returns just the updated item, not the full cart
+        // We need to fetch the full cart to get the updated state
+        revalidatePath("/cart");
+        return await getCart();
+    } catch (err) {
+        console.error("updateCartItemQty error:", err);
+        throw err;
+    }
+}
+
+/**
+ * Remove item from cart
+ * DELETE /api/cart/items/:itemId
+ */
+export async function removeCartItem(itemId: string): Promise<Cart | null> {
+    const token = await getBackendAccessToken();
     if (!token) throw new Error("Authentication required");
 
     try {
-        const res = await fetch(`${process.env.API_URL}/cart/${cartItemId}`, {
+        const res = await fetch(`${API_URL}/api/cart/items/${itemId}`, {
             method: "DELETE",
             headers: {
-                token: token.token as string,
+                Authorization: `Bearer ${token}`,
             },
         });
 
-        if (!res.ok) throw new Error("Failed to remove item from cart");
+        if (!res.ok) {
+            const errorData = await res.json().catch(() => ({}));
+            throw new Error(
+                errorData.message || `Failed to remove item: ${res.statusText}`
+            );
+        }
+
+        // Fetch the updated cart after removal
         revalidatePath("/cart");
-        return await getCart(); // Return the populated cart
+        return await getCart();
     } catch (err) {
         console.error("removeCartItem error:", err);
         throw err;
     }
 }
 
-export async function updateCartItem(
-    cartItemId: string,
-    count: number
-): Promise<Cart | null> {
-    const token = await getAuthToken();
+/**
+ * Clear entire cart
+ * DELETE /api/cart
+ */
+export async function clearCart(): Promise<boolean> {
+    const token = await getBackendAccessToken();
     if (!token) throw new Error("Authentication required");
 
     try {
-        const res = await fetch(`${process.env.API_URL}/cart/${cartItemId}`, {
-            method: "PUT",
-            headers: {
-                "Content-Type": "application/json",
-                token: token.token as string,
-            },
-            body: JSON.stringify({ count }),
-        });
-
-        if (!res.ok) throw new Error("Failed to update item");
-        revalidatePath("/cart");
-        return await getCart(); // Return the populated cart
-    } catch (err) {
-        console.error("updateCartItem error:", err);
-        throw err;
-    }
-}
-
-export async function clearCart(): Promise<Cart | null> {
-    const token = await getAuthToken();
-    if (!token) throw new Error("Authentication required");
-
-    try {
-        const res = await fetch(`${process.env.API_URL}/cart`, {
+        const res = await fetch(`${API_URL}/api/cart`, {
             method: "DELETE",
             headers: {
-                token: token.token as string,
+                Authorization: `Bearer ${token}`,
             },
         });
 
-        // The clear cart API returns a different, simpler response.
-        // We just need to know it succeeded, then we can fetch the (now empty) cart.
-        if (!res.ok) throw new Error("Failed to clear cart");
+        if (!res.ok) {
+            const errorData = await res.json().catch(() => ({}));
+            throw new Error(
+                errorData.message || `Failed to clear cart: ${res.statusText}`
+            );
+        }
+
         revalidatePath("/cart");
-        return await getCart(); // Should return null or an empty cart
+        return true;
     } catch (err) {
         console.error("clearCart error:", err);
         throw err;
     }
 }
 
-// ... checkOutSession remains the same as it doesn't return a cart object
-export async function checkOutSession(cartId: string) {
-    const token = await getAuthToken();
+/**
+ * Create checkout session
+ * POST /api/orders/checkout-session/:cartId
+ */
+export async function createCheckoutSession(cartId: string) {
+    const token = await getBackendAccessToken();
     if (!token) throw new Error("Authentication required");
 
     const shippingAddress = {
@@ -155,25 +205,28 @@ export async function checkOutSession(cartId: string) {
 
     try {
         const res = await fetch(
-            `${process.env.API_URL}/orders/checkout-session/${cartId}?url=${process.env.NEXTAUTH_URL}`,
+            `${API_URL}/api/orders/checkout-session/${cartId}?url=${process.env.NEXTAUTH_URL}`,
             {
                 method: "POST",
                 headers: {
+                    Authorization: `Bearer ${token}`,
                     "Content-Type": "application/json",
-                    token: token.token as string,
                 },
                 body: JSON.stringify({ shippingAddress }),
             }
         );
 
         if (!res.ok) {
-            throw new Error("Failed to start checkout session");
+            const errorData = await res.json().catch(() => ({}));
+            throw new Error(
+                errorData.message ||
+                    `Failed to create checkout: ${res.statusText}`
+            );
         }
 
-        const data = await res.json();
-        return data; // Return the session data for redirection on the client
+        return await res.json();
     } catch (err) {
-        console.error("checkOutSession error:", err);
+        console.error("createCheckoutSession error:", err);
         throw err;
     }
 }

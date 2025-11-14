@@ -1,63 +1,95 @@
-import React from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import Image from "next/image";
-import { Category } from "@/interface/category";
-import Loading from "@/app/loading";
+import { Suspense } from "react";
 import Link from "next/link";
+import { Search } from "lucide-react";
+import { fetchCategories } from "@/services/categoryActions";
+import { CategoryGrid } from "./_components/CategoryGrid";
+import { CategoryCardSkeleton } from "./_components/CategoryCardSkeleton";
+import { SearchCategories } from "./_components/SearchCategories";
+import WhatsAppButton from "@/components/WhatsAppButton";
 
-async function getCategories() {
-    const res = await fetch(`${process.env.API_URL}/categories`, {
-        next: {
-            revalidate: 60 * 60 * 24 * 30,
-        },
-    });
-    if (res.ok) {
-        const data = await res.json();
-        return data.data as Category[];
-    } else {
-        throw new Error("Failed to fetch categories");
-    }
+export const metadata = {
+    title: "Categories | Halima E-Commerce Store",
+    description: "Browse all product categories",
+};
+
+interface CategoriesPageProps {
+    searchParams: {
+        search?: string;
+        page?: string;
+    };
 }
-export default async function AllCategories() {
-    const categories = await getCategories();
+
+export default async function CategoriesPage({
+    searchParams,
+}: CategoriesPageProps) {
+    const params = await searchParams;
+    const { categories, meta } = await fetchCategories({
+        search: params.search,
+        page: params.page ? parseInt(params.page) : 1,
+        limit: 12,
+    });
+
     return (
-        <>
-            {categories.length === 0 ? (
-                <Loading />
-            ) : (
-                <div className="container mx-auto p-4 space-y-6">
-                    <h1 className="text-2xl font-bold">Categories</h1>
-                    <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                        {categories.map((cat) => (
-                            <Card
-                                key={cat._id}
-                                className="hover:shadow-lg transition rounded-2xl overflow-hidden"
-                            >
-                                <Link href={"/categories/" + cat._id}>
-                                    <CardHeader className="p-0">
-                                        <Image
-                                            quality={30}
-                                            src={cat.image}
-                                            alt={cat.name}
-                                            width={400}
-                                            height={200}
-                                            className="w-full h-40 object-cover"
-                                        />
-                                    </CardHeader>
-                                    <CardContent className="p-4">
-                                        <CardTitle className="text-lg">
-                                            {cat.name}
-                                        </CardTitle>
-                                        <p className="text-sm text-muted-foreground">
-                                            {cat.slug}
-                                        </p>
-                                    </CardContent>
-                                </Link>
-                            </Card>
-                        ))}
+        <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/20">
+            {/* Breadcrumb */}
+            <div className="border-b border-border/60 bg-background/90 backdrop-blur-sm">
+                <div className="mx-auto max-w-screen-2xl px-4 py-4 lg:px-8">
+                    <nav className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Link
+                            href="/"
+                            className="transition-colors hover:text-foreground"
+                        >
+                            Home
+                        </Link>
+                        <span>/</span>
+                        <span className="font-medium text-foreground">
+                            Categories
+                        </span>
+                    </nav>
+                </div>
+            </div>
+
+            {/* Header */}
+            <div className="border-b border-border/60 bg-background/50">
+                <div className="mx-auto max-w-screen-2xl px-4 py-8 lg:px-8 lg:py-12">
+                    <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+                                Categories
+                            </h1>
+                            <p className="mt-2 text-sm text-muted-foreground">
+                                Discover our curated collection of{" "}
+                                {meta.totalCategories} categories
+                            </p>
+                        </div>
+
+                        {/* Search */}
+                        <div className="w-full sm:w-auto sm:min-w-[320px]">
+                            <SearchCategories />
+                        </div>
                     </div>
                 </div>
-            )}
-        </>
+            </div>
+
+            {/* Categories Grid */}
+            <div className="mx-auto max-w-screen-2xl px-4 py-8 lg:px-8 lg:py-12">
+                <Suspense
+                    fallback={
+                        <div className="grid grid-cols-2 gap-4 sm:gap-6 md:grid-cols-3 lg:grid-cols-4">
+                            {Array.from({ length: 8 }).map((_, i) => (
+                                <CategoryCardSkeleton key={i} />
+                            ))}
+                        </div>
+                    }
+                >
+                    <CategoryGrid
+                        categories={categories}
+                        meta={meta}
+                        currentSearch={params.search}
+                    />
+                </Suspense>
+            </div>
+            <WhatsAppButton variant="floating" />
+        </div>
     );
 }

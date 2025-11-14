@@ -54,8 +54,8 @@ export default function Navbar() {
 
     const basePaths = [
         { name: "Products", href: "/products" },
-        { name: "Brands", href: "/brands" },
         { name: "Categories", href: "/categories" },
+        { name: "About", href: "/about" },
     ];
 
     // add orders only if authenticated
@@ -198,9 +198,9 @@ export default function Navbar() {
                                 <div className="relative p-1.5 cursor-pointer">
                                     {!loading &&
                                         cart &&
-                                        cart.numOfCartItems > 0 && (
+                                        cart.totalItems > 0 && (
                                             <Badge className="absolute top-0 end-0 h-4 min-w-3 rounded-full p-1 text-xs font-semibold translate-x-1/2 text-muted">
-                                                {cart.numOfCartItems}
+                                                {cart.totalItems}
                                             </Badge>
                                         )}
                                     <ShoppingCart />

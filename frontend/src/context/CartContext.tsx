@@ -35,15 +35,15 @@ export default function CartContextProvider({
             setLoading(false);
             return;
         }
+
         if (status === "authenticated") {
             setLoading(true);
             try {
                 const newCart = await getCart();
                 setCart(newCart);
             } catch (error) {
-                if (error instanceof Error)
-                    toast.error("Failed to load cart: " + error.message);
-                setCart(null); // Clear cart on error
+                console.error("Failed to load cart:", error);
+                setCart(null);
             } finally {
                 setLoading(false);
             }

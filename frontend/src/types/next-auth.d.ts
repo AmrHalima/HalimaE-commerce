@@ -1,18 +1,26 @@
-import { UserResponse } from "@/interface/login";
-import NextAuth, { User } from "next-auth";
 import { JWT } from "next-auth/jwt";
+import NextAuth from "next-auth";
+
 declare module "next-auth" {
     interface Session {
-        user: UserResponse;
-    }
-    interface User {
-        user: UserResponse;
-        token: string;
+        user: {
+            name?: string | null;
+            email?: string | null;
+            role?: "admin" | "employee" | "customer";
+            // Note: Backend access token is NOT exposed in session for security
+            // Use getBackendAccessToken() server-side function to retrieve it
+        };
     }
 }
-// eslint-disable-next-line @typescript-eslint/no-empty-interface
+
 declare module "next-auth/jwt" {
-    interface JWT extends User {
-        id?: string;
+    interface JWT {
+        role?: "admin" | "employee" | "customer";
+        token?: string; // backend access token
+        user?: {
+            name?: string | null;
+            email?: string | null;
+            role?: "admin" | "employee" | "customer";
+        };
     }
 }

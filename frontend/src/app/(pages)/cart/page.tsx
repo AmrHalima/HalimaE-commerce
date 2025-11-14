@@ -1,25 +1,30 @@
 "use client";
 
-import Loading from "@/app/loading";
+import { useContext, useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { CartContext } from "@/context/CartContext";
 import {
-    checkOutSession,
-    clearCart,
-    getCart,
+    updateCartItemQty,
     removeCartItem,
-    updateCartItem,
+    clearCart,
+    createCheckoutSession,
 } from "@/services/cartActions";
-import { ChevronsRightIcon, ShoppingCart, Trash2Icon } from "lucide-react";
-import { useSession } from "next-auth/react";
-import Image from "next/image";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useContext, useEffect, useState } from "react";
 import { toast } from "sonner";
+import {
+    Minus,
+    Plus,
+    Trash2,
+    ShoppingCart,
+    ChevronsRightIcon,
+} from "lucide-react";
+import Loading from "@/app/loading";
 
 export function formatCurrency(num: number) {
-    return new Intl.NumberFormat("en-us", {
+    return new Intl.NumberFormat("en-EG", {
         style: "currency",
         currency: "EGP",
     }).format(num);
@@ -31,98 +36,175 @@ export default function Cart() {
     const { status } = useSession();
     const router = useRouter();
 
-    // Load cart when authenticated
+    // Debug logging
     useEffect(() => {
-        let mounted = true;
+        console.log("Cart state changed:", {
+            hasCart: !!cart,
+            itemCount: cart?.items?.length || 0,
+            totalItems: cart?.totalItems || 0,
+            loading,
+            actionLoading,
+        });
+    }, [cart, loading, actionLoading]);
 
-        async function fetchCart() {
-            try {
-                setLoading(true);
-                const newCart = await getCart();
-                if (!mounted) return;
+    // Calculate total price
+    const calculateTotal = () => {
+        if (!cart?.items) return 0;
+        return cart.items.reduce((total, item) => {
+            const price = parseFloat(item.variant.prices[0]?.amount || "0");
+            return total + price * item.qty;
+        }, 0);
+    };
 
-                // sanitize: sometimes product can be a string (bad data) — filter such entries
-                if (
-                    newCart?.data?.products &&
-                    Array.isArray(newCart.data.products)
-                ) {
-                    newCart.data.products = newCart.data.products.filter(
-                        (p) => p && typeof p.product === "object"
-                    );
-                }
+    const handleDecrease = async (itemId: string, currentQty: number) => {
+        if (currentQty <= 1) return;
 
-                setCart(newCart ?? null);
-            } catch (err) {
-                console.error("fetchCart error:", err);
-                toast.error("Failed to fetch cart");
-            } finally {
-                if (mounted) setLoading(false);
-            }
-        }
+        // Store previous cart for rollback
+        const previousCart = cart;
 
-        if (status === "authenticated") {
-            fetchCart();
-        } else if (status === "unauthenticated") {
-            // clear cart on unauthenticated
-            setCart(null);
-        }
-
-        return () => {
-            mounted = false;
-        };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [status]);
-
-    // helpers for item actions
-    const handleDecrease = async (productId: string, count: number) => {
         try {
             setActionLoading(true);
-            const newCart = await updateCartItem(productId, count - 1);
-            if (newCart?.status === "success") {
+
+            // Optimistic update
+            if (cart) {
+                const updatedItems = cart.items.map((item) =>
+                    item.id === itemId ? { ...item, qty: currentQty - 1 } : item
+                );
+                setCart({ ...cart, items: updatedItems });
+            }
+
+            const newCart = await updateCartItemQty(itemId, currentQty - 1);
+
+            console.log("API Response for decrease:", newCart);
+
+            // Always set the cart to what the API returns
+            if (newCart && newCart.items && newCart.items.length > 0) {
                 setCart(newCart);
-                toast.success("Item quantity updated");
-            } else {
-                toast.error("Failed to update item");
+                toast.success("Quantity updated");
+            } else if (
+                !newCart ||
+                !newCart.items ||
+                newCart.items.length === 0
+            ) {
+                // API returned empty cart, revert to previous
+                console.error("API returned empty cart, reverting");
+                setCart(previousCart);
+                toast.error("Cart update failed - keeping previous state");
             }
         } catch (err) {
             console.error("decrease error:", err);
-            toast.error("Something went wrong");
+            // Revert to previous cart state
+            if (previousCart) {
+                setCart(previousCart);
+            }
+            toast.error("Failed to update quantity");
         } finally {
             setActionLoading(false);
         }
     };
 
-    const handleIncrease = async (productId: string, count: number) => {
+    const handleIncrease = async (itemId: string, currentQty: number) => {
+        // Store previous cart for rollback
+        const previousCart = cart;
+
         try {
             setActionLoading(true);
-            const newCart = await updateCartItem(productId, count + 1);
-            if (newCart?.status === "success") {
+
+            // Optimistic update
+            if (cart) {
+                const updatedItems = cart.items.map((item) =>
+                    item.id === itemId ? { ...item, qty: currentQty + 1 } : item
+                );
+                const newTotalItems = cart.items.reduce((sum, item) => {
+                    if (item.id === itemId) return sum + currentQty + 1;
+                    return sum + item.qty;
+                }, 0);
+                setCart({
+                    ...cart,
+                    items: updatedItems,
+                    totalItems: newTotalItems,
+                });
+            }
+
+            const newCart = await updateCartItemQty(itemId, currentQty + 1);
+
+            console.log("API Response for increase:", newCart);
+
+            // Always set the cart to what the API returns
+            if (newCart && newCart.items && newCart.items.length > 0) {
                 setCart(newCart);
-                toast.success("Item quantity updated");
-            } else {
-                toast.error("Failed to update item");
+                toast.success("Quantity updated");
+            } else if (
+                !newCart ||
+                !newCart.items ||
+                newCart.items.length === 0
+            ) {
+                // API returned empty cart, revert to previous
+                console.error("API returned empty cart, reverting");
+                setCart(previousCart);
+                toast.error("Cart update failed - keeping previous state");
             }
         } catch (err) {
             console.error("increase error:", err);
-            toast.error("Something went wrong");
+            // Revert to previous cart state
+            if (previousCart) {
+                setCart(previousCart);
+            }
+            toast.error("Failed to update quantity");
         } finally {
             setActionLoading(false);
         }
     };
 
-    const handleRemove = async (productId: string) => {
+    const handleRemove = async (itemId: string) => {
+        // Store previous cart for rollback
+        const previousCart = cart;
+
         try {
             setActionLoading(true);
-            const newCart = await removeCartItem(productId);
-            if (newCart?.status === "success") {
-                setCart(newCart);
-                toast.success("Item removed from cart");
-            } else {
-                toast.error("Failed to remove item");
+
+            // Optimistic update - remove item from UI
+            if (cart) {
+                const updatedItems = cart.items.filter(
+                    (item) => item.id !== itemId
+                );
+                const removedItem = cart.items.find(
+                    (item) => item.id === itemId
+                );
+                const newTotalItems = Math.max(
+                    0,
+                    cart.totalItems - (removedItem?.qty || 0)
+                );
+
+                if (updatedItems.length === 0) {
+                    // Last item being removed, show empty immediately
+                    setCart(null);
+                } else {
+                    setCart({
+                        ...cart,
+                        items: updatedItems,
+                        totalItems: newTotalItems,
+                    });
+                }
             }
+
+            const newCart = await removeCartItem(itemId);
+
+            // Update based on API response
+            if (newCart && newCart.items && newCart.items.length > 0) {
+                setCart(newCart);
+            } else {
+                // Cart is now empty
+                setCart(null);
+            }
+            toast.success("Item removed from cart");
         } catch (err) {
             console.error("remove error:", err);
-            toast.error("Something went wrong");
+            // Revert to previous cart state
+            if (previousCart) {
+                setCart(previousCart);
+            }
+            toast.error("Failed to remove item");
         } finally {
             setActionLoading(false);
         }
@@ -131,17 +213,14 @@ export default function Cart() {
     const handleClearCart = async () => {
         try {
             setActionLoading(true);
-            const res = await clearCart();
-            // your API returned { message: 'success' } previously — handle safely
-            if (res?.message === "success" || res?.status === "success") {
+            const success = await clearCart();
+            if (success) {
                 toast.success("Cart cleared");
                 setCart(null);
-            } else {
-                toast.error("Failed to clear cart");
             }
         } catch (err) {
             console.error("clearCart error:", err);
-            toast.error("Something went wrong");
+            toast.error("Failed to clear cart");
         } finally {
             setActionLoading(false);
         }
@@ -156,12 +235,13 @@ export default function Cart() {
         try {
             setLoading(true);
             if (cart) {
-                const data = await checkOutSession(cart?.cartId);
-                if (data.status == "success") {
+                const data = await createCheckoutSession(cart.id);
+                if (data.status === "success" && data.session?.url) {
                     router.push(data.session.url);
+                } else {
+                    toast.error("Failed to create checkout session");
                 }
             }
-            // checkOutSession will redirect on success
         } catch (err) {
             console.error("checkout error:", err);
             toast.error("Checkout failed");
@@ -169,12 +249,6 @@ export default function Cart() {
             setLoading(false);
         }
     };
-
-    // Render logic:
-    // - show Loading if session or cart context is loading
-    // - if unauthenticated show empty state prompting login
-    // - if cart empty show empty state
-    // - otherwise show cart items
 
     if (status === "loading" || loading) {
         return <Loading />;
@@ -185,25 +259,28 @@ export default function Cart() {
             <div className="container mx-auto px-4 py-6 text-center">
                 <h1 className="text-3xl font-bold tracking-tight">Your Cart</h1>
                 <p className="text-muted-foreground mt-1">
-                    Please <Link href="/login">login</Link> to see your shopping
-                    cart.
+                    Please{" "}
+                    <Link href="/login" className="underline">
+                        login
+                    </Link>{" "}
+                    to see your shopping cart.
                 </p>
                 <div className="mt-6 flex justify-center gap-3">
                     <Link href="/login">
-                        <Button variant="outline">Login</Button>
+                        <Button>Login</Button>
                     </Link>
                     <Link href="/register">
-                        <Button>Sign Up</Button>
+                        <Button variant="outline">Sign Up</Button>
                     </Link>
                 </div>
             </div>
         );
     }
 
-    // At this point session is authenticated
-    const hasItems = !!(cart && cart.numOfCartItems && cart.numOfCartItems > 0);
+    // During action loading, show current cart state (don't switch to empty)
+    const hasItems = !!(cart && cart.items && cart.items.length > 0);
 
-    if (!hasItems) {
+    if (!hasItems && !actionLoading) {
         return (
             <div className="container mx-auto px-4 py-6 text-center">
                 <h1 className="text-3xl font-bold tracking-tight">
@@ -214,112 +291,171 @@ export default function Cart() {
                 </p>
                 <Link href={"/products"}>
                     <Button variant={"outline"} className="w-1/3 mt-4 mx-auto">
-                        <ShoppingCart /> Start Shopping
+                        <ShoppingCart className="mr-2" /> Start Shopping
                     </Button>
                 </Link>
             </div>
         );
     }
 
+    // If cart becomes null during action, show loading
+    if (!cart) {
+        return <Loading />;
+    }
+
+    const totalPrice = calculateTotal();
+
     return (
         <div className="container mx-auto px-4 py-6">
             <h1 className="text-3xl font-bold tracking-tight">Shopping Cart</h1>
             <p className="text-muted-foreground mt-1">
-                {cart?.numOfCartItems} items in your cart
+                {cart.totalItems} {cart.totalItems === 1 ? "item" : "items"} in
+                your cart
             </p>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
                 {/* Items Column */}
                 <div className="lg:col-span-2 space-y-4">
-                    {cart?.data?.products?.map(
-                        ({ _id, product, price, count }) => {
-                            // guard: if product is invalid, skip
-                            if (!product || typeof product === "string")
-                                return null;
+                    {cart.items.map((item) => {
+                        const price = parseFloat(
+                            item.variant.prices[0]?.amount || "0"
+                        );
+                        const compareAtPrice = item.variant.prices[0]?.compareAt
+                            ? parseFloat(item.variant.prices[0].compareAt)
+                            : null;
+                        const imageUrl =
+                            item.variant.product.images[0]?.url ||
+                            "/placeholder.png";
 
-                            return (
-                                <div
-                                    key={_id}
-                                    className="flex gap-4 rounded-xl border p-4 shadow-sm bg-card"
+                        return (
+                            <div
+                                key={item.id}
+                                className="flex gap-4 border rounded-xl p-4 shadow-sm bg-card"
+                            >
+                                {/* Product Image */}
+                                <Link
+                                    href={`/products/${item.variant.product.slug}`}
+                                    className="relative w-24 h-24 flex-shrink-0 rounded-lg overflow-hidden bg-muted"
                                 >
                                     <Image
-                                        src={product.imageCover}
-                                        alt={product.title}
-                                        className="w-24 h-24 rounded-lg object-cover md:w-28 md:h-28"
-                                        width={100}
-                                        height={100}
+                                        src={imageUrl}
+                                        alt={item.variant.product.name}
+                                        fill
+                                        className="object-cover"
+                                        sizes="96px"
                                     />
+                                </Link>
 
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-                                            <div className="min-w-0">
-                                                <h3 className="font-semibold text-base md:text-lg line-clamp-2">
-                                                    {product.title}
-                                                </h3>
-                                                <p className="text-sm text-muted-foreground mt-1">
-                                                    {product.brand?.name} ·{" "}
-                                                    {product.category?.name}
-                                                </p>
+                                {/* Product Details */}
+                                <div className="flex-1 min-w-0">
+                                    <Link
+                                        href={`/products/${item.variant.product.slug}`}
+                                    >
+                                        <h3 className="font-semibold text-base hover:text-primary transition-colors truncate">
+                                            {item.variant.product.name}
+                                        </h3>
+                                    </Link>
+
+                                    {/* Variant Details */}
+                                    <div className="text-sm text-muted-foreground mt-1 space-y-0.5">
+                                        {item.variant.size && (
+                                            <p>Size: {item.variant.size}</p>
+                                        )}
+                                        {item.variant.color && (
+                                            <div className="flex items-center gap-2">
+                                                <span>Color:</span>
+                                                <div
+                                                    className="w-4 h-4 rounded-full border"
+                                                    style={{
+                                                        backgroundColor:
+                                                            item.variant.color,
+                                                    }}
+                                                />
                                             </div>
+                                        )}
+                                        {item.variant.material && (
+                                            <p>
+                                                Material:{" "}
+                                                {item.variant.material}
+                                            </p>
+                                        )}
+                                        <p className="text-xs text-muted-foreground/70">
+                                            SKU: {item.variant.sku}
+                                        </p>
+                                    </div>
 
-                                            <div className="text-right shrink-0">
-                                                <div className="font-semibold">
+                                    {/* Price & Quantity Controls */}
+                                    <div className="flex items-center justify-between mt-3">
+                                        <div>
+                                            <div className="font-semibold text-lg">
+                                                {formatCurrency(price)}
+                                            </div>
+                                            {compareAtPrice && (
+                                                <div className="text-sm text-muted-foreground line-through">
                                                     {formatCurrency(
-                                                        price * count
+                                                        compareAtPrice
                                                     )}
                                                 </div>
-                                            </div>
+                                            )}
                                         </div>
 
-                                        {/* Quantity Controls */}
-                                        <div className="mt-3 flex items-center justify-between">
-                                            <div className="flex items-center gap-2">
-                                                {count > 1 && (
-                                                    <button
-                                                        onClick={() =>
-                                                            handleDecrease(
-                                                                product._id,
-                                                                count
-                                                            )
-                                                        }
-                                                        aria-label="decrease"
-                                                        className="h-8 w-8 grid place-items-center rounded-lg border hover:bg-accent"
-                                                    >
-                                                        –
-                                                    </button>
-                                                )}
-                                                <span className="w-6 text-center font-medium">
-                                                    {count}
-                                                </span>
-                                                <button
+                                        <div className="flex items-center gap-3">
+                                            {/* Quantity Controls */}
+                                            <div className="flex items-center gap-2 border rounded-lg">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8"
                                                     onClick={() =>
-                                                        handleIncrease(
-                                                            product._id,
-                                                            count
+                                                        handleDecrease(
+                                                            item.id,
+                                                            item.qty
                                                         )
                                                     }
-                                                    aria-label="increase"
-                                                    className="h-8 w-8 grid place-items-center rounded-lg border hover:bg-accent"
+                                                    disabled={
+                                                        actionLoading ||
+                                                        item.qty <= 1
+                                                    }
                                                 >
-                                                    +
-                                                </button>
+                                                    <Minus className="h-4 w-4" />
+                                                </Button>
+                                                <span className="w-8 text-center font-medium">
+                                                    {item.qty}
+                                                </span>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8"
+                                                    onClick={() =>
+                                                        handleIncrease(
+                                                            item.id,
+                                                            item.qty
+                                                        )
+                                                    }
+                                                    disabled={actionLoading}
+                                                >
+                                                    <Plus className="h-4 w-4" />
+                                                </Button>
                                             </div>
 
-                                            <button
+                                            {/* Remove Button */}
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                                                 onClick={() =>
-                                                    handleRemove(product._id)
+                                                    handleRemove(item.id)
                                                 }
-                                                aria-label="remove"
-                                                className="text-destructive hover:underline text-sm"
+                                                disabled={actionLoading}
                                             >
-                                                Remove
-                                            </button>
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
                                         </div>
                                     </div>
                                 </div>
-                            );
-                        }
-                    )}
+                            </div>
+                        );
+                    })}
                 </div>
 
                 {/* Summary Column */}
@@ -328,21 +464,23 @@ export default function Cart() {
                         Order Summary
                     </h2>
                     <div className="flex justify-between text-sm mb-2">
-                        <span>Subtotal {cart?.numOfCartItems} items</span>
-                        <span>
-                            {formatCurrency(cart?.data?.totalCartPrice ?? 0)}
+                        <span className="text-muted-foreground">Subtotal</span>
+                        <span className="font-medium">
+                            {formatCurrency(totalPrice)}
                         </span>
                     </div>
 
                     <div className="flex justify-between text-sm mb-2">
-                        <span>Shipping</span>
-                        <span>{formatCurrency(0)}</span>
+                        <span className="text-muted-foreground">Shipping</span>
+                        <span className="font-medium text-muted-foreground">
+                            Calculated at checkout
+                        </span>
                     </div>
 
-                    <div className="flex justify-between font-semibold text-base border-t pt-2">
+                    <div className="flex justify-between font-semibold text-base border-t pt-2 mt-2">
                         <span>Total</span>
-                        <span>
-                            {formatCurrency(cart?.data?.totalCartPrice ?? 0)}
+                        <span className="text-primary">
+                            {formatCurrency(totalPrice)}
                         </span>
                     </div>
 
@@ -350,22 +488,27 @@ export default function Cart() {
                         variant="default"
                         className="w-full mt-4"
                         onClick={handleCheckout}
+                        disabled={loading || actionLoading}
                     >
-                        <ChevronsRightIcon /> Proceed to Checkout
+                        <ChevronsRightIcon className="mr-2" /> Proceed to
+                        Checkout
                     </Button>
 
                     <Link href={"/products"}>
-                        <Button variant={"outline"} className="w-full mt-4">
-                            <ShoppingCart /> Continue Shopping
+                        <Button variant="outline" className="w-full mt-2">
+                            <ShoppingCart className="mr-2 h-4 w-4" />
+                            Continue Shopping
                         </Button>
                     </Link>
 
                     <Button
-                        variant="destructive"
-                        className="w-full mt-4"
+                        variant="ghost"
+                        className="w-full mt-2 text-destructive hover:text-destructive hover:bg-destructive/10"
                         onClick={handleClearCart}
+                        disabled={actionLoading}
                     >
-                        <Trash2Icon /> Clear Cart
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Clear Cart
                     </Button>
                 </div>
             </div>
