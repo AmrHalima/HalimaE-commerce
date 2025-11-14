@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe, LoggerService } from '@nestjs/common';
 import { ServeStaticModule } from '@nestjs/serve-static';
@@ -79,9 +80,7 @@ export async function setupE2ETest() {
         transform: true,
         transformOptions: { enableImplicitConversion: true },
     }));
-    
-    // This is the key change. It maps the physical directory where images are stored
-    // to the URL path that the ProductImageService generates.
+
     app.useStaticAssets(join(__dirname, '..', 'public', 'uploads'), {
         prefix: '/images/',
     });

@@ -58,7 +58,6 @@ export class CartController {
         return result;
     }
 
-    // Get lightweight cart for checkout
     @Get('checkout')
     @ApiOperation({ summary: 'Get cart for checkout', description: 'Retrieve a lightweight version of the cart with only essential data needed for checkout' })
     @ApiStandardResponse(CheckoutCartDto, 'Checkout cart retrieved successfully')
@@ -68,7 +67,6 @@ export class CartController {
         return this.cartService.getCartForCheckout(req.customer.id);
     }
 
-    // Get cart items count (for header badge)
     @Get('count')
     @ApiOperation({ summary: 'Get cart items count', description: 'Get the total number of items in the cart (useful for header badge)' })
     @ApiStandardResponse(Object, 'Cart count retrieved successfully')
@@ -91,7 +89,6 @@ export class CartController {
         return this.cartService.calculateCartTotal(req.customer.id, currency);
     }
 
-    // Add item to cart
     @Post('items')
     @ApiOperation({ summary: 'Add item to cart', description: 'Add a product variant to the shopping cart with specified quantity' })
     @ApiStandardResponse(AddToCartResponseDto, 'Item added to cart successfully', 201)
@@ -106,7 +103,6 @@ export class CartController {
         return this.cartService.addToCart(req.customer.id, addToCartDto);
     }
 
-    // Update cart item quantity
     @Patch('items/:itemId')
     @ApiOperation({ summary: 'Update cart item', description: 'Update the quantity of a cart item (set to 0 to remove)' })
     @ApiStandardResponse(AddToCartResponseDto, 'Cart item updated successfully')
@@ -121,7 +117,6 @@ export class CartController {
         return this.cartService.updateCartItem(req.customer.id, itemId, updateCartItemDto);
     }
 
-    // Remove item from cart
     @Delete('items/:itemId')
     @ApiOperation({ summary: 'Remove item from cart', description: 'Remove a specific item from the shopping cart' })
     @ApiStandardNoContentResponse('Cart item removed successfully')
@@ -135,7 +130,6 @@ export class CartController {
         return this.cartService.removeFromCart(req.customer.id, itemId);
     }
 
-    // Clear entire cart
     @Delete()
     @ApiOperation({ summary: 'Clear cart', description: 'Remove all items from the shopping cart' })
     @ApiStandardNoContentResponse('Cart cleared successfully')

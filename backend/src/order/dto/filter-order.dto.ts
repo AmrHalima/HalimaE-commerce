@@ -10,7 +10,7 @@ export class FilterOrderDto {
   })
   @IsOptional()
   @IsEnum(ORDERSTATUS)
-  status?: ORDERSTATUS;
+  readonly status?: ORDERSTATUS;
 
   @ApiPropertyOptional({
     description: 'Payment status filter',
@@ -18,7 +18,7 @@ export class FilterOrderDto {
   })
   @IsOptional()
   @IsEnum(PAYMENTSTATUS)
-  paymentStatus?: PAYMENTSTATUS;
+  readonly paymentStatus?: PAYMENTSTATUS;
 
   @ApiPropertyOptional({
     description: 'Fulfillment status filter',
@@ -26,7 +26,7 @@ export class FilterOrderDto {
   })
   @IsOptional()
   @IsEnum(FULFILLMENTSTATUS)
-  fulfillmentStatus?: FULFILLMENTSTATUS;
+  readonly fulfillmentStatus?: FULFILLMENTSTATUS;
 
   @ApiPropertyOptional({
     description: 'Page number',
@@ -37,7 +37,7 @@ export class FilterOrderDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  page?: number = 1;
+  readonly page?: number = 1;
 
   @ApiPropertyOptional({
     description: 'Items per page',
@@ -48,7 +48,7 @@ export class FilterOrderDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  limit?: number = 10;
+  readonly limit?: number = 10;
 
   @ApiPropertyOptional({
     description: 'Search by order number',
@@ -56,5 +56,21 @@ export class FilterOrderDto {
   })
   @IsOptional()
   @IsString()
-  orderNo?: string;
+  readonly orderNo?: string;
+
+  @ApiPropertyOptional({
+    description: 'Field to order by',
+    example: 'createdAt'
+  })
+  @IsOptional()
+  @IsString()
+  readonly orderBy?: string;
+
+  @ApiPropertyOptional({
+    description: 'Sort order',
+    example: 'asc'
+  })
+  @IsOptional()
+  @IsEnum(['asc', 'desc'])
+  readonly sortOrder?: 'asc' | 'desc';
 }

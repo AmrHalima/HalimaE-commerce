@@ -11,6 +11,7 @@ import { CustomerModule } from './customer/customer.module';
 import { LogModule } from './logger/log.module';
 import { CartModule } from './cart/cart.module';
 import { OrderModule } from './order/order.module';
+import { PaymentModule } from './payment/payment.module';
 
 @Module({
     imports: [
@@ -33,6 +34,7 @@ import { OrderModule } from './order/order.module';
         LogModule,
         CartModule,
         OrderModule,
+        PaymentModule,
     ],
     providers: [
         {

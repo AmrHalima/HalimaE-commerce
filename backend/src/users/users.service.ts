@@ -20,7 +20,6 @@ export class UsersService {
         };
     }
 
-  // create user: connect role by roleId
   async create(dto: CreateUserDto): Promise<ReturnType<typeof this.toUserResponse>> {
     const existingUser = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (existingUser) {
@@ -41,7 +40,6 @@ export class UsersService {
     return this.toUserResponse(user);
   }
 
-  // find one: include single role
   async findById(id: string): Promise<ReturnType<typeof this.toUserResponse>> {
     const user = await this.prisma.user.findUnique({
         where: { id },

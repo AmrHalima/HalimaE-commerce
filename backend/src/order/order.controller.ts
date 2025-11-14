@@ -54,7 +54,7 @@ interface RequestWithCustomer {
 export class OrderController {
     constructor(private readonly orderService: OrderService) {}
 
-    @Post()
+    @Post('checkout')
     @UseGuards(JwtCustomerGuard)
     @ApiBearerAuth()
     @HttpCode(HttpStatus.CREATED)
