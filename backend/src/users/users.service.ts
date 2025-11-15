@@ -5,6 +5,13 @@ import * as argon2 from 'argon2';
 import { LogService } from '../logger/log.service';
 import { PROVIDER, User, Role } from '@prisma/client';
 type UserWithRole = User & { role: Role | { name: string } | null };
+
+function addDays(date: Date, days: number): Date {
+    const result = new Date(date);
+    result.setDate(result.getDate() + days);
+    return result;
+}
+
 @Injectable()
 export class UsersService {
     constructor(
@@ -81,4 +88,118 @@ export class UsersService {
     });
     return this.toUserResponse(updatedUser);
   }
+
+    async storeRefreshToken(userId: string, hashedRefreshToken: string, device?: string | null, ip?: string | null): Promise<void> {
+        const createdToken = await this.prisma.refreshToken.create({
+            data: {
+                userId,
+                isRevoked: false,
+                tokenHash: hashedRefreshToken,
+                expiresAt: addDays(new Date(), 7),
+                device,
+                ip
+            }
+        });
+
+        if (!createdToken) {
+            throw Error("failed to store refresh token"); // TODO: handle come up with good status code
+        }
+    }
+
+    async updateRefreshToken(id: string, userId: string, hashedRefreshToken: string): Promise<void> {
+        const updatedToken = await this.prisma.refreshToken.update({
+            where: { id, userId },
+            data: {
+                isRevoked: false,
+                tokenHash: hashedRefreshToken,
+                expiresAt: addDays(new Date(), 7),
+            }
+        });
+
+        if (!updatedToken) {
+            throw Error("failed to store refresh token"); // TODO: handle come up with good status code
+        }
+    }
+
+    async findRefreshToken(tokenHash: string) {
+        return this.prisma.refreshToken.findFirst({
+            where: {
+                tokenHash,
+                isRevoked: false,
+                expiresAt: {
+                    gt: new Date(),
+                }
+            },
+            include: {
+                user: {
+                    select: { id: true, email: true, role: { select: { name: true } } }
+                }
+            }
+        });
+    }
+
+    async findRefreshTokensByUserId(userId: string) {
+        return this.prisma.refreshToken.findMany({
+            where: {
+                userId,
+                isRevoked: false,
+                expiresAt: {
+                    gt: new Date(),
+                }
+            },
+            include: {
+                user: {
+                    select: { id: true, email: true, role: { select: { name: true } } }
+                }
+            }
+        });
+    }
+
+    async revokeRefreshToken(tokenId: string): Promise<void> {
+        await this.prisma.refreshToken.update({
+            where: { id: tokenId },
+            data: { isRevoked: true }
+        });
+    }
+
+    async revokeAllUserRefreshTokens(userId: string): Promise<void> {
+        await this.prisma.refreshToken.updateMany({
+            where: { userId, isRevoked: false },
+            data: { isRevoked: true }
+        });
+    }
+
+    async cleanupExpiredTokens(): Promise<number> {
+        const result = await this.prisma.refreshToken.deleteMany({
+            where: {
+                OR: [
+                    { expiresAt: { lt: new Date() } },
+                    { isRevoked: true, createdAt: { lt: addDays(new Date(), -30) } } // Delete revoked tokens older than 30 days
+                ]
+            }
+        });
+        return result.count;
+  }
+
+    async getActiveSessions(userId: string) {
+        return this.prisma.refreshToken.findMany({
+            where: {
+                userId,
+                isRevoked: false,
+                expiresAt: {
+                    gt: new Date(),
+                }
+            },
+            select: {
+                id: true,
+                device: true,
+                ip: true,
+                createdAt: true,
+                expiresAt: true,
+            },
+            orderBy: {
+                createdAt: 'desc'
+            }
+        });
+    }
 }

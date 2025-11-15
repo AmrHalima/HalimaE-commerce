@@ -9,6 +9,7 @@ import { LogService } from './logger/log.service';
 import { ResponseInterceptor } from '../common/interceptors/response.interceptor';
 import { GlobalExceptionFilter } from '../common/filters/global-exception.filter';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import cookieParser from 'cookie-parser';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -45,6 +46,8 @@ async function bootstrap() {
   });
   
   app.setGlobalPrefix('/api');
+  
+  app.use(cookieParser(configService.get<string>('COOKIE_SECRET')));
   
   // Swagger configuration
   const config = new DocumentBuilder()

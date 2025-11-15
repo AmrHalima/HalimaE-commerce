@@ -145,6 +145,8 @@ model User {
   roleId String? @db.Uuid
   role   Role?   @relation(fields: [roleId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
+  refreshTokens RefreshToken[]
+
   @@index([roleId])
   @@map("users")
 }
@@ -169,6 +171,24 @@ model User {
 //   @@index([permissionId])
 //   @@map("role_permissions")
 // }
+
+model RefreshToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  tokenHash String
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  isRevoked Boolean  @default(false)
+
+  device    String?
+  ip        String?
+    @@index([userId])
+    @@map("refresh_tokens")
+    @@index([tokenHash])
+}
+
 
 model Customer {
   id           String    @id @default(uuid()) @db.Uuid
