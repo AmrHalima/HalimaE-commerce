@@ -28,8 +28,22 @@ export class UserAuthController {
     @ApiStandardErrorResponse(401, 'Unauthorized', 'Authentication required')
     @ApiStandardErrorResponse(403, 'Forbidden', 'Only admins can create new users')
     @ApiStandardErrorResponse(409, 'Email already exists', 'A user with this email already exists')
-    async signup(@Body() dto: CreateUserDto): Promise<UserResponseDto> {
-        return this.authService.signup(dto);
+    async signup(@Body() dto: CreateUserDto, @Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<UserResponseDto> {
+        const { refresh_token, ...result } = await this.authService.signup(
+            dto,
+            req.headers['user-agent'],
+            req.ip
+        );
+
+        res.cookie('refresh_token', refresh_token, {
+            httpOnly: true,
+            secure: this.configService.get('NODE_ENV') === 'production',
+            sameSite: 'strict',
+            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+            path: '/api/admin/auth',
+        });
+
+        return result;
     }
 
     @Post('login')

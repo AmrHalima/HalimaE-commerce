@@ -16,7 +16,7 @@ export class UserAuthService {
         private readonly logger: LogService,
     ) { }
 
-    async signup(dto: CreateUserDto) {
+    async signup(dto: CreateUserDto, device?: string, ip?: string): Promise<UserResponseDto & { refresh_token: string }> {
         this.logger.debug(`Attempting to sign up user with email: ${dto.email}`, UserAuthService.name);
         const user = await this.userService.create(dto);
         this.logger.log(`User created successfully: ${user.email} (ID: ${user.id})`, UserAuthService.name);
