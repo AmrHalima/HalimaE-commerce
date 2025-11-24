@@ -34,6 +34,7 @@ describe('UserAuthController (e2e)', () => {
 
     describe('Authentication Flow', () => {
         let adminDto: CreateUserDto;
+        let adminToken: string;
 
         beforeAll(async () => {
             // Use unique test data to avoid conflicts
@@ -48,6 +49,131 @@ describe('UserAuthController (e2e)', () => {
             // Create admin user directly
             const usersService = app.get(UsersService);
             await usersService.create(adminDto);
+
+            // Login to get admin token for authenticated signup tests
+            const loginResponse = await request(app.getHttpServer())
+                .post('/api/admin/auth/login')
+                .send({ email: adminDto.email, password: adminDto.password });
+
+            adminToken = extractAuthTokenFromResponse(loginResponse);
+        });
+
+        describe('POST /admin/auth/signup', () => {
+            it('should register a new user and set refresh_token cookie (admin only)', async () => {
+                const uniqueData = getUniqueTestData('admin-signup');
+                const signupDto = {
+                    name: uniqueData.name,
+                    email: uniqueData.email,
+                    password: 'password123',
+                    roleId: adminRoleId
+                };
+
+                const response = await request(app.getHttpServer())
+                    .post('/api/admin/auth/signup')
+                    .set('Authorization', `Bearer ${adminToken}`)
+                    .send(signupDto)
+                    .expect(201);
+
+                const data = expectSuccessResponse<any>(response, 201);
+
+                // Verify response contains access_token but NOT refresh_token
+                expect(data.access_token).toBeDefined();
+                expect(data.refresh_token).toBeUndefined();
+                expect(data.email).toBe(signupDto.email);
+                expect(data.name).toBe(signupDto.name);
+
+                // Verify refresh_token cookie is set
+                const cookies = response.headers['set-cookie'] as unknown as string[];
+                expect(cookies).toBeDefined();
+                expect(Array.isArray(cookies)).toBe(true);
+
+                const refreshCookie = cookies.find((c: string) => c.startsWith('refresh_token='))!;
+                expect(refreshCookie).toBeDefined();
+
+                // Verify cookie attributes
+                expect(refreshCookie).toContain('HttpOnly');
+                expect(refreshCookie).toContain('Path=/api/admin/auth');
+                expect(refreshCookie).toContain('SameSite=Strict');
+
+                // Verify user can login with new credentials
+                const loginResponse = await request(app.getHttpServer())
+                    .post('/api/admin/auth/login')
+                    .send({ email: signupDto.email, password: signupDto.password })
+                    .expect(201);
+
+                const loginData = expectSuccessResponse<any>(loginResponse, 201);
+                expect(loginData.access_token).toBeDefined();
+                expect(loginData.email).toBe(signupDto.email);
+            });
+
+            it('should reject signup with duplicate email', async () => {
+                const response = await request(app.getHttpServer())
+                    .post('/api/admin/auth/signup')
+                    .set('Authorization', `Bearer ${adminToken}`)
+                    .send(adminDto)
+                    .expect(409);
+
+                expectErrorResponse(response, 409);
+            });
+
+            it('should reject signup with invalid email format', async () => {
+                const uniqueData = getUniqueTestData('admin-invalid');
+                const response = await request(app.getHttpServer())
+                    .post('/api/admin/auth/signup')
+                    .set('Authorization', `Bearer ${adminToken}`)
+                    .send({
+                        name: uniqueData.name,
+                        email: 'invalid-email',
+                        password: 'password123',
+                        roleId: adminRoleId
+                    })
+                    .expect(400);
+
+                expectErrorResponse(response, 400);
+            });
+
+            it('should reject signup with weak password', async () => {
+                const uniqueData = getUniqueTestData('admin-weak');
+                const response = await request(app.getHttpServer())
+                    .post('/api/admin/auth/signup')
+                    .set('Authorization', `Bearer ${adminToken}`)
+                    .send({
+                        name: uniqueData.name,
+                        email: uniqueData.email,
+                        password: '123',
+                        roleId: adminRoleId
+                    })
+                    .expect(400);
+
+                expectErrorResponse(response, 400);
+            });
+
+            it('should reject signup with missing required fields', async () => {
+                const response = await request(app.getHttpServer())
+                    .post('/api/admin/auth/signup')
+                    .set('Authorization', `Bearer ${adminToken}`)
+                    .send({
+                        email: 'test@test.com'
+                    })
+                    .expect(400);
+
+                expectErrorResponse(response, 400);
+            });
+
+            it('should reject signup without authentication', async () => {
+                const uniqueData = getUniqueTestData('admin-noauth');
+                const response = await request(app.getHttpServer())
+                    .post('/api/admin/auth/signup')
+                    .send({
+                        name: uniqueData.name,
+                        email: uniqueData.email,
+                        password: 'password123',
+                        roleId: adminRoleId
+                    })
+                    .expect(401);
+
+                expectErrorResponse(response, 401);
+            });
         });
 
         describe('POST /admin/auth/login', () => {
