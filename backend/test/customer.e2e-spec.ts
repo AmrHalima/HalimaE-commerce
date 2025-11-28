@@ -1,6 +1,6 @@
 import { INestApplication, LoggerService } from '@nestjs/common';
 import request from 'supertest';
-import { setupE2ETest, teardownE2ETest } from './jest-e2e.setup';
+import { setupE2ETest, teardownE2ETest, getUniqueTestData } from './jest-e2e.setup';
 import * as argon2 from 'argon2';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { CreateAddressDto } from '../src/customer/dto';
@@ -12,12 +12,15 @@ describe('CustomerController (e2e)', () => {
     let prisma: PrismaService;
     let adminToken: string;
     let customerToken: string;
+    let customerRefreshCookie: string;
     let addressId: string;
     let logger: LoggerService;
+    let testCustomer: { email: string; name: string; slug: string; sku: string };
 
     beforeAll(async () => {
         ({ app, prisma } = await setupE2ETest());
         logger = app.get<LoggerService>(LogService);
+        testCustomer = getUniqueTestData('customer');
 
         // 1. Create Roles
         let role = await prisma.role.findFirst({
@@ -57,33 +60,329 @@ describe('CustomerController (e2e)', () => {
 
 
     describe('POST /customers/auth', () => {
-        it('should create a new customer', async () => {
+        it('should create a new customer and set refresh_token cookie', async () => {
             const response = await request(app.getHttpServer())
                 .post('/api/customers/auth/signup')
                 .send({
-                    name: 'Customer test',
-                    email: 'customer@test.com',
+                    name: testCustomer.name,
+                    email: testCustomer.email,
                     password: 'password',
                     phone: '1234567890'
                 });
             logger.debug?.(`Response: ${JSON.stringify(response.body)}`, 'CustomerAuthController');
 
             const data = expectSuccessResponse<any>(response, 201);
-            expect(data.name).toBe('Customer test');
-            expect(data.email).toBe('customer@test.com');
+            expect(data.name).toBe(testCustomer.name);
+            expect(data.email).toBe(testCustomer.email);
             expect(data.phone).toBe('1234567890');
             expect(data).toHaveProperty('access_token');
+            expect(data.refresh_token).toBeUndefined(); // Should NOT be in body
             customerToken = data.access_token;
+
+            // Verify refresh_token cookie is set
+            const cookies = response.headers['set-cookie'] as unknown as string[];
+            expect(cookies).toBeDefined();
+            const refreshCookie = cookies?.find((c: string) => c.startsWith('refresh_token='));
+            expect(refreshCookie).toBeDefined();
+            expect(refreshCookie).toContain('HttpOnly');
+            customerRefreshCookie = refreshCookie!;
         });
 
-        it('should login a customer', async () => {
+        it('should reject signup with duplicate email', async () => {
+            const response = await request(app.getHttpServer())
+                .post('/api/customers/auth/signup')
+                .send({
+                    name: testCustomer.name,
+                    email: testCustomer.email,
+                    password: 'password',
+                    phone: '1234567890'
+                });
+
+            expectErrorResponse(response, 409);
+        });
+
+        it('should login a customer and set refresh_token cookie', async () => {
             const response = await request(app.getHttpServer())
                 .post('/api/customers/auth/login')
-                .send({ email: 'customer@test.com', password: 'password' });
+                .send({ email: testCustomer.email, password: 'password' });
 
             const data = expectSuccessResponse<any>(response, 200);
             expect(data).toHaveProperty('access_token');
+            expect(data.refresh_token).toBeUndefined(); // Should NOT be in body
             customerToken = data.access_token;
+
+            // Verify refresh_token cookie is set
+            const cookies = response.headers['set-cookie'] as unknown as string[];
+            expect(cookies).toBeDefined();
+            const refreshCookie = cookies?.find((c: string) => c.startsWith('refresh_token='));
+            expect(refreshCookie).toBeDefined();
+            expect(refreshCookie).toContain('HttpOnly');
+            customerRefreshCookie = refreshCookie!;
+        });
+
+        it('should reject login with invalid password', async () => {
+            const response = await request(app.getHttpServer())
+                .post('/api/customers/auth/login')
+                .send({ email: testCustomer.email, password: 'wrongpassword' });
+
+            expectErrorResponse(response, 401);
+        });
+
+        it('should reject login with non-existent email', async () => {
+            const response = await request(app.getHttpServer())
+                .post('/api/customers/auth/login')
+                .send({ email: 'nonexistent@test.com', password: 'password' });
+
+            expectErrorResponse(response, 401);
+        });
+    });
+
+    describe('POST /customers/auth/refresh-token', () => {
+        it('should refresh access token using cookie', async () => {
+            // First login to get a fresh cookie
+            const loginResp = await request(app.getHttpServer())
+                .post('/api/customers/auth/login')
+                .send({ email: testCustomer.email, password: 'password' });
+
+            const loginCookies = loginResp.headers['set-cookie'] as unknown as string[];
+            const loginCookie = loginCookies.find((c: string) => c.startsWith('refresh_token='))!;
+            const oldToken = extractAuthTokenFromResponse(loginResp);
+
+            // Small delay to ensure different iat timestamp in JWT
+            await new Promise(resolve => setTimeout(resolve, 1100));
+
+            // Use the cookie to refresh
+            const response = await request(app.getHttpServer())
+                .post('/api/customers/auth/refresh-token')
+                .set('Cookie', loginCookie);
+
+            expect(response.status).toBe(201);
+            const data = expectSuccessResponse<any>(response, 201);
+            expect(data.access_token).toBeDefined();
+            expect(data.access_token).not.toBe(oldToken); // Should be a new token (different iat)
+
+            // Verify new refresh_token cookie is set (token rotation)
+            const cookies = response.headers['set-cookie'] as unknown as string[];
+            expect(cookies).toBeDefined();
+            const newRefreshCookie = cookies.find((c: string) => c.startsWith('refresh_token='))!;
+            expect(newRefreshCookie).toBeDefined();
+            expect(newRefreshCookie).not.toBe(loginCookie); // Should be rotated
+
+            // Update for subsequent tests
+            customerRefreshCookie = newRefreshCookie;
+            customerToken = data.access_token;
+        });
+
+        it('should reject refresh without cookie', async () => {
+            const response = await request(app.getHttpServer())
+                .post('/api/customers/auth/refresh-token');
+
+            expectErrorResponse(response, 401);
+            expect(response.body.error.message).toContain('Refresh token not found');
+        });
+
+        it('should reject refresh with invalid token', async () => {
+            const response = await request(app.getHttpServer())
+                .post('/api/customers/auth/refresh-token')
+                .set('Cookie', 'refresh_token=invalid_token');
+
+            expectErrorResponse(response, 401);
+        });
+
+        it('should prevent token reuse (token rotation)', async () => {
+            // Get a fresh token
+            const loginResponse = await request(app.getHttpServer())
+                .post('/api/customers/auth/login')
+                .send({ email: testCustomer.email, password: 'password' });
+
+            const loginCookies = loginResponse.headers['set-cookie'] as unknown as string[];
+            const originalRefreshCookie = loginCookies.find((c: string) => c.startsWith('refresh_token='))!;
+
+            // Use the token once
+            await request(app.getHttpServer())
+                .post('/api/customers/auth/refresh-token')
+                .set('Cookie', originalRefreshCookie)
+                .expect(201);
+
+            // Try to reuse the old token - should fail
+            const reuseResponse = await request(app.getHttpServer())
+                .post('/api/customers/auth/refresh-token')
+                .set('Cookie', originalRefreshCookie);
+
+            expectErrorResponse(reuseResponse, 401);
+        });
+    });
+
+    describe('POST /customers/auth/logout', () => {
+        it('should logout from current device and clear cookie', async () => {
+            // Login to get a fresh session
+            const loginResponse = await request(app.getHttpServer())
+                .post('/api/customers/auth/login')
+                .send({ email: testCustomer.email, password: 'password' });
+
+            const loginCookies = loginResponse.headers['set-cookie'] as unknown as string[];
+            const logoutRefreshCookie = loginCookies.find((c: string) => c.startsWith('refresh_token='))!;
+            const logoutToken = extractAuthTokenFromResponse(loginResponse);
+
+            // Logout
+            const logoutResponse = await request(app.getHttpServer())
+                .post('/api/customers/auth/logout')
+                .set('Authorization', `Bearer ${logoutToken}`)
+                .set('Cookie', logoutRefreshCookie);
+
+            expectSuccessResponse(logoutResponse, 200);
+            expect(logoutResponse.body.data.message).toContain('Logged out');
+
+            // Verify cookie is cleared
+            const logoutCookies = logoutResponse.headers['set-cookie'] as unknown as string[];
+            expect(logoutCookies).toBeDefined();
+            const clearedCookie = logoutCookies.find((c: string) => c.startsWith('refresh_token='))!;
+            expect(clearedCookie).toMatch(/Max-Age=0|Expires=Thu, 01 Jan 1970/);
+
+            // Try to use the token - should fail
+            const refreshResponse = await request(app.getHttpServer())
+                .post('/api/customers/auth/refresh-token')
+                .set('Cookie', logoutRefreshCookie);
+
+            expectErrorResponse(refreshResponse, 401);
+        });
+
+        it('should reject logout without authentication', async () => {
+            const response = await request(app.getHttpServer())
+                .post('/api/customers/auth/logout');
+
+            expectErrorResponse(response, 401);
+        });
+    });
+
+    describe('POST /customers/auth/logout-all', () => {
+        it('should logout from all devices', async () => {
+            // Create multiple sessions by logging in multiple times
+            const login1 = await request(app.getHttpServer())
+                .post('/api/customers/auth/login')
+                .set('User-Agent', 'Device1')
+                .send({ email: testCustomer.email, password: 'password' });
+
+            const login2 = await request(app.getHttpServer())
+                .post('/api/customers/auth/login')
+                .set('User-Agent', 'Device2')
+                .send({ email: testCustomer.email, password: 'password' });
+
+            const token1 = extractAuthTokenFromResponse(login1);
+            const cookie1 = (login1.headers['set-cookie'] as unknown as string[]).find((c: string) => c.startsWith('refresh_token='))!;
+            const cookie2 = (login2.headers['set-cookie'] as unknown as string[]).find((c: string) => c.startsWith('refresh_token='))!;
+
+            // Logout from all devices
+            const logoutAllResponse = await request(app.getHttpServer())
+                .post('/api/customers/auth/logout-all')
+                .set('Authorization', `Bearer ${token1}`)
+                .set('Cookie', cookie1);
+
+            expectSuccessResponse(logoutAllResponse, 200);
+            expect(logoutAllResponse.body.data.message).toContain('Logged out');
+
+            // Verify both tokens are revoked
+            await request(app.getHttpServer())
+                .post('/api/customers/auth/refresh-token')
+                .set('Cookie', cookie1)
+                .expect(401);
+
+            await request(app.getHttpServer())
+                .post('/api/customers/auth/refresh-token')
+                .set('Cookie', cookie2)
+                .expect(401);
+        });
+
+        it('should reject unauthenticated logout-all request', async () => {
+            const response = await request(app.getHttpServer())
+                .post('/api/customers/auth/logout-all')
+                .set('Cookie', ''); // Explicitly clear any cookies
+
+            expectErrorResponse(response, 401);
+        });
+    });
+
+    describe('Multi-device session management', () => {
+        it('should maintain separate sessions per device', async () => {
+            // Get customer for cleanup
+            const customer = await prisma.customer.findUnique({ where: { email: testCustomer.email } });
+            if (customer) {
+                await prisma.customerRefreshToken.deleteMany({ where: { customerId: customer.id } });
+            }
+
+            // Login from two devices
+            const device1Login = await request(app.getHttpServer())
+                .post('/api/customers/auth/login')
+                .set('User-Agent', 'Chrome/Windows')
+                .send({ email: testCustomer.email, password: 'password' });
+
+            const device2Login = await request(app.getHttpServer())
+                .post('/api/customers/auth/login')
+                .set('User-Agent', 'Safari/Mac')
+                .send({ email: testCustomer.email, password: 'password' });
+
+            const token1 = extractAuthTokenFromResponse(device1Login);
+            const cookie1 = (device1Login.headers['set-cookie'] as unknown as string[]).find((c: string) => c.startsWith('refresh_token='))!;
+            const cookie2 = (device2Login.headers['set-cookie'] as unknown as string[]).find((c: string) => c.startsWith('refresh_token='))!;
+
+            expect(cookie1).toBeDefined();
+            expect(cookie2).toBeDefined();
+
+            // Both should be able to refresh independently
+            const refresh1 = await request(app.getHttpServer())
+                .post('/api/customers/auth/refresh-token')
+                .set('Cookie', cookie1)
+                .expect(201);
+
+            const refresh2 = await request(app.getHttpServer())
+                .post('/api/customers/auth/refresh-token')
+                .set('Cookie', cookie2)
+                .expect(201);
+
+            // Get updated cookies after refresh
+            const newCookie1 = (refresh1.headers['set-cookie'] as unknown as string[]).find((c: string) => c.startsWith('refresh_token='))!;
+            const newCookie2 = (refresh2.headers['set-cookie'] as unknown as string[]).find((c: string) => c.startsWith('refresh_token='))!;
+
+            // Verify tokens are different
+            expect(newCookie1).not.toBe(newCookie2);
+
+            // Verify we have exactly 2 active tokens in database
+            const tokens = await prisma.customerRefreshToken.findMany({
+                where: { customerId: customer!.id, isRevoked: false }
+            });
+            expect(tokens).toHaveLength(2);
+
+            // Logout from device1 only
+            await request(app.getHttpServer())
+                .post('/api/customers/auth/logout')
+                .set('Authorization', `Bearer ${token1}`)
+                .set('Cookie', newCookie1)
+                .expect(200);
+
+            // Verify only 1 token left
+            const tokensAfterLogout = await prisma.customerRefreshToken.findMany({
+                where: { customerId: customer!.id, isRevoked: false }
+            });
+            expect(tokensAfterLogout).toHaveLength(1);
+
+            // Device1 should be logged out
+            await request(app.getHttpServer())
+                .post('/api/customers/auth/refresh-token')
+                .set('Cookie', newCookie1)
+                .expect(401);
+
+            // Device2 should still work
+            await request(app.getHttpServer())
+                .post('/api/customers/auth/refresh-token')
+                .set('Cookie', newCookie2)
+                .expect(201);
+
+            // Update customerToken for subsequent tests
+            const finalLogin = await request(app.getHttpServer())
+                .post('/api/customers/auth/login')
+                .send({ email: testCustomer.email, password: 'password' });
+            customerToken = extractAuthTokenFromResponse(finalLogin);
+            customerRefreshCookie = (finalLogin.headers['set-cookie'] as unknown as string[]).find((c: string) => c.startsWith('refresh_token='))!;
         });
     });
 
@@ -95,8 +394,8 @@ describe('CustomerController (e2e)', () => {
 
             const data = expectSuccessResponse<any>(response, 200);
             expect(data).toHaveProperty('id');
-            expect(data.name).toBe('Customer test');
-            expect(data.email).toBe('customer@test.com');
+            expect(data.name).toContain('customer'); // Name contains the prefix
+            expect(data.email).toBe(testCustomer.email);
             expect(data.phone).toBe('1234567890');
         });
     });
@@ -106,10 +405,10 @@ describe('CustomerController (e2e)', () => {
             const response = await request(app.getHttpServer())
                 .patch('/api/customers/me')
                 .set('Authorization', `Bearer ${customerToken}`)    
-                .send({ name: 'Customer test updated' });
+                .send({ name: `${testCustomer.name} updated` });
                 
             const data = expectSuccessResponse<any>(response, 200);
-            expect(data.name).toBe('Customer test updated');
+            expect(data.name).toBe(`${testCustomer.name} updated`);
         });
     });
 
@@ -144,13 +443,13 @@ describe('CustomerController (e2e)', () => {
 
         it('should get all customers with search', async () => {
             const response = await request(app.getHttpServer())
-                .get('/api/customers/admin/all?search=test')
+                .get('/api/customers/admin/all?search=customer')
                 .set('Authorization', `Bearer ${adminToken}`);
                 
             const data = expectSuccessResponse<any>(response, 200);
             expect(data.data).toBeInstanceOf(Array);
             expect(data.data.length).toBeGreaterThan(0);
-            expect(data.data[0].name).toContain('test');
+            expect(data.data[0].name).toContain('customer');
         });
 
         it('should get all customers with sort', async () => {

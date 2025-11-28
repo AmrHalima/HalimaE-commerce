@@ -45,6 +45,7 @@ async function cleanDatabase(prisma: PrismaService) {
     await prisma.collection.deleteMany().catch(() => {});
     await prisma.category.deleteMany().catch(() => {});
     await prisma.address.deleteMany().catch(() => {});
+    await prisma.customerRefreshToken.deleteMany().catch(() => {});
     await prisma.customer.deleteMany().catch(() => {});
     await prisma.refreshToken.deleteMany().catch(() => { });
     await prisma.user.deleteMany().catch(() => {});

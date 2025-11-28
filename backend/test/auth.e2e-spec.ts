@@ -356,10 +356,12 @@ describe('UserAuthController (e2e)', () => {
 
                 const loginCookies = loginResponse.headers['set-cookie'] as unknown as string[];
                 const logoutRefreshCookie = loginCookies.find((c: string) => c.startsWith('refresh_token='))!;
+                const logoutToken = extractAuthTokenFromResponse(loginResponse);
 
                 // Logout
                 const logoutResponse = await request(app.getHttpServer())
                     .post('/api/admin/auth/logout')
+                    .set('Authorization', `Bearer ${logoutToken}`)
                     .set('Cookie', logoutRefreshCookie)
                     .expect(200);
 
@@ -383,13 +385,12 @@ describe('UserAuthController (e2e)', () => {
                 expectErrorResponse(refreshResponse, 401);
             });
 
-            it('should allow logout without cookie (graceful)', async () => {
+            it('should reject logout without authentication', async () => {
                 const response = await request(app.getHttpServer())
                     .post('/api/admin/auth/logout')
-                    .expect(200);
+                    .expect(401);
 
-                expectSuccessResponse(response, 200);
-                expect(response.body.data.message).toContain('Logged out');
+                expectErrorResponse(response, 401);
             });
         });
 
@@ -493,6 +494,7 @@ describe('UserAuthController (e2e)', () => {
                 // Get updated cookies after refresh (token rotation)
                 const newCookie1 = (refresh1.headers['set-cookie'] as unknown as string[]).find((c: string) => c.startsWith('refresh_token='))!;
                 const newCookie2 = (refresh2.headers['set-cookie'] as unknown as string[]).find((c: string) => c.startsWith('refresh_token='))!;
+                const newToken1 = extractAuthTokenFromResponse(refresh1);
 
                 // Verify the cookies are different
                 expect(newCookie1).not.toBe(newCookie2);
@@ -506,6 +508,7 @@ describe('UserAuthController (e2e)', () => {
                 // Logout from device1 only
                 await request(app.getHttpServer())
                     .post('/api/admin/auth/logout')
+                    .set('Authorization', `Bearer ${newToken1}`)
                     .set('Cookie', newCookie1)
                     .expect(200);
 
