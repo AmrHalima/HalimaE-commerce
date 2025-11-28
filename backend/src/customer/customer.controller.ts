@@ -26,6 +26,7 @@ import {
     ResponseAddressDto
 } from './dto';
 import { AddressService } from './address.service';
+import type { RequestWithCustomer } from '../../common/types/request-with-customer.type';
 
 @ApiTags('customers')
 @ApiExtraModels(CreateCustomerDto, UpdateCustomerDto, CreateAddressDto, UpdateAddressDto, ResponseCustomerDto, ResponseAddressDto)
@@ -44,9 +45,9 @@ export class CustomerController {
     @ApiStandardErrorResponse(401, 'Unauthorized', 'Authentication required')
     @ApiStandardErrorResponse(404, 'Customer not found', 'Customer profile does not exist')
     @HttpCode(HttpStatus.OK)
-    async getProfile(@Request() req: any) {
-        // The 'user' object is attached to the request by the JwtCustomerGuard
-        return this.customerService.findById(req.customer.id);
+    async getProfile(@Request() req: RequestWithCustomer) {
+        // The 'customer' object is attached to the request by the JwtCustomerGuard
+        return this.customerService.findById(req.customer.sub);
     }
 
     @UseGuards(JwtCustomerGuard)
@@ -58,8 +59,8 @@ export class CustomerController {
     @ApiStandardErrorResponse(401, 'Unauthorized', 'Authentication required')
     @ApiStandardErrorResponse(404, 'Customer not found', 'Customer profile does not exist')
     @HttpCode(HttpStatus.OK)
-    async updateProfile(@Request() req: any, @Body() dto: UpdateCustomerDto) {
-        return this.customerService.update(req.customer.id, dto);
+    async updateProfile(@Request() req: RequestWithCustomer, @Body() dto: UpdateCustomerDto) {
+        return this.customerService.update(req.customer.sub, dto);
     }
 
     // Admin-only routes
@@ -99,8 +100,8 @@ export class CustomerController {
     @ApiStandardErrorResponse(400, 'Invalid address data', 'Validation failed for address creation')
     @ApiStandardErrorResponse(401, 'Unauthorized', 'Authentication required')
     @HttpCode(HttpStatus.CREATED)
-    async createCustomerAddress(@Request() req: any, @Body() dto: CreateAddressDto) {
-        return this.addressService.create(req.customer.id, dto);
+    async createCustomerAddress(@Request() req: RequestWithCustomer, @Body() dto: CreateAddressDto) {
+        return this.addressService.create(req.customer.sub, dto);
     }
 
     @UseGuards(JwtCustomerGuard)
@@ -111,8 +112,8 @@ export class CustomerController {
     @ApiStandardErrorResponse(401, 'Unauthorized', 'Authentication required')
     @ApiStandardErrorResponse(404, 'Address not found', 'Address with the given ID was not found')
     @HttpCode(HttpStatus.OK)
-    async getCustomerAddress(@Request() req: any, @Param('id') id: string) {
-        return this.addressService.findById(req.customer.id, id);
+    async getCustomerAddress(@Request() req: RequestWithCustomer, @Param('id') id: string) {
+        return this.addressService.findById(req.customer.sub, id);
     }
 
 
@@ -123,8 +124,8 @@ export class CustomerController {
     @ApiStandardResponse(ResponseAddressDto, 'Addresses retrieved successfully')
     @ApiStandardErrorResponse(401, 'Unauthorized', 'Authentication required')
     @HttpCode(HttpStatus.OK)
-    async getCustomerAddresses(@Request() req: any) {
-        return this.addressService.findAll(req.customer.id);
+    async getCustomerAddresses(@Request() req: RequestWithCustomer) {
+        return this.addressService.findAll(req.customer.sub);
     }
 
     @UseGuards(JwtCustomerGuard)
@@ -136,7 +137,7 @@ export class CustomerController {
     @ApiStandardErrorResponse(401, 'Unauthorized', 'Authentication required')
     @ApiStandardErrorResponse(404, 'Address not found', 'Address with the given ID was not found')
     @HttpCode(HttpStatus.OK)
-    async updateCustomerAddress(@Request() req: any, @Param('id') id: string, @Body() dto: CreateAddressDto) {
-        return this.addressService.update(req.customer.id, id, dto);
+    async updateCustomerAddress(@Request() req: RequestWithCustomer, @Param('id') id: string, @Body() dto: CreateAddressDto) {
+        return this.addressService.update(req.customer.sub, id, dto);
     }
 }
