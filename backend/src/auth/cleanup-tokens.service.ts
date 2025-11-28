@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { UsersService } from '../users/users.service';
 import { CustomerService } from '../customer/customer.service';
-import { LogService } from 'src/logger/log.service';
+import { LogService } from '../logger/log.service';
 
 @Injectable()
 export class CleanupTokensService {
