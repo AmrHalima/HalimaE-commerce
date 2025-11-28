@@ -27,6 +27,6 @@ export class JwtCustomerStrategy extends PassportStrategy(Strategy, 'jwt-custome
         if (!customer) {
             throw new UnauthorizedException('Customer not found');
         }
-        return {id: customer.id, email: customer.email};
+        return {sub: customer.id, email: customer.email};
     }
 }
