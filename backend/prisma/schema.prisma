@@ -189,6 +189,24 @@ model RefreshToken {
     @@index([tokenHash])
 }
 
+model CustomerRefreshToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  tokenHash String
+  customerId    String   @db.Uuid
+  customer      Customer     @relation(fields: [customerId], references: [id])
+
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  isRevoked Boolean  @default(false)
+
+  device    String?
+  ip        String?
+  
+  @@index([customerId])
+  @@map("customer_refresh_tokens")
+  @@index([tokenHash])
+}
+
 
 model Customer {
   id           String    @id @default(uuid()) @db.Uuid
@@ -202,9 +220,10 @@ model Customer {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  addresses Address[]
-  carts     Cart[]
-  orders    Order[]
+  refreshTokens CustomerRefreshToken[]
+  addresses     Address[]
+  carts         Cart[]
+  orders        Order[]
  
   @@index([status])
   @@index([createdAt])
