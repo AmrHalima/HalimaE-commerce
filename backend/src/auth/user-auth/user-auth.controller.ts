@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Post, Req, Res, UseGuards, UnauthorizedException, HttpCode } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiExtraModels } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiExtraModels, ApiCookieAuth } from '@nestjs/swagger';
 import { ApiStandardResponse, ApiStandardErrorResponse } from '../../../common/swagger/api-response.decorator';
 import { CreateUserDto, LoginUserDto, UserResponseDto } from '../../users/dto';
 import { UserAuthService } from './user-auth.service';
@@ -75,12 +75,13 @@ export class UserAuthController {
 
     @Post('refresh-token')
     @HttpCode(200)
+    @ApiCookieAuth('refresh_token')
     @ApiOperation({
         summary: 'Refresh access token',
         description: 'Get a new access token using the refresh token from httpOnly cookie. The old refresh token is revoked and a new one is set (token rotation).'
     })
     @ApiStandardResponse(Object, 'Token refreshed successfully')
-    @ApiStandardErrorResponse(401, 'Unauthorized', 'Invalid or expired refresh token')
+    @ApiStandardErrorResponse(401, 'Unauthorized', 'Invalid, expired, or missing refresh token')
     async refreshToken(@Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<{ access_token: string }> {
         const refresh_token = req.cookies?.refresh_token;
 
@@ -104,6 +105,8 @@ export class UserAuthController {
 
     @Post('logout')
     @HttpCode(200)
+    @UseGuards(JwtUserGuard)
+    @ApiBearerAuth('JWT-auth')
     @ApiOperation({
         summary: 'Logout from current device',
         description: 'Revoke the refresh token for the current session/device only. Reads refresh token from httpOnly cookie and clears it.'

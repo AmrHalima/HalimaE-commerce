@@ -1,16 +1,12 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto, UpdateUserDto } from './dto';
 import * as argon2 from 'argon2';
 import { LogService } from '../logger/log.service';
 import { PROVIDER, User, Role } from '@prisma/client';
-type UserWithRole = User & { role: Role | { name: string } | null };
+import { addDays } from '../utils';
 
-function addDays(date: Date, days: number): Date {
-    const result = new Date(date);
-    result.setDate(result.getDate() + days);
-    return result;
-}
+type UserWithRole = User & { role: Role | { name: string } | null };
 
 @Injectable()
 export class UsersService {
@@ -102,23 +98,11 @@ export class UsersService {
         });
 
         if (!createdToken) {
-            throw Error("failed to store refresh token"); // TODO: handle come up with good status code
+            this.logger.error(`Failed to store refresh token for user ID: ${userId}`, UsersService.name);
+            throw new InternalServerErrorException("internal server error"); // TODO: handle come up with good error message
         }
-    }
 
-    async updateRefreshToken(id: string, userId: string, hashedRefreshToken: string): Promise<void> {
-        const updatedToken = await this.prisma.refreshToken.update({
-            where: { id, userId },
-            data: {
-                isRevoked: false,
-                tokenHash: hashedRefreshToken,
-                expiresAt: addDays(new Date(), 7),
-            }
-        });
-
-        if (!updatedToken) {
-            throw Error("failed to store refresh token"); // TODO: handle come up with good status code
-        }
+        this.logger.log(`Refresh token stored for user ID: ${userId}`, UsersService.name);
     }
 
     async findRefreshToken(tokenHash: string) {

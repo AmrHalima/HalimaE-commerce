@@ -53,7 +53,7 @@ export class UserAuthService {
         });
 
         const refresh_token = await this.jwtService.signAsync({
-            ...payload,
+            payload,
             jti: randomUUID(), // Add unique identifier
         } as any, {
             secret: this.configService.get<string>('JWT_USER_REFRESH_SECRET')!,
@@ -165,6 +165,8 @@ export class UserAuthService {
             }
         }
 
+
+
         this.logger.warn(`Logout: Token not found for user ${payload.sub}`, UserAuthService.name);
     }
 
@@ -174,6 +176,6 @@ export class UserAuthService {
     }
 
     async getActiveSessions(userId: string) {
-        return this.userService.getActiveSessions(userId);
+        return await this.userService.getActiveSessions(userId);
     }
 }
