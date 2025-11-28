@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import {
     CreateCustomerDto,
     UpdateCustomerDto
@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import * as argon2 from 'argon2';
 import { Prisma } from '@prisma/client';
 import { LogService } from '../logger/log.service';
+import { addDays } from '../utils';
 
 @Injectable()
 export class CustomerService {
@@ -146,4 +147,114 @@ export class CustomerService {
             throw error;
         }
     }
+    
+    async storeRefreshToken(customerId: string, hashedRefreshToken: string, device?: string | null, ip?: string | null) {
+        this.logger.debug(`Storing refresh token for customer ID: ${customerId}`, CustomerService.name);
+        const createdToken = await this.prisma.customerRefreshToken.create({
+            data: {
+                customerId,
+                tokenHash: hashedRefreshToken,
+                device   : device,
+                ip       : ip,
+                expiresAt: addDays(new Date(), 7),   // 7 days
+            }
+        });
+
+        if (!createdToken) {
+            this.logger.error(`Failed to store refresh token for customer ID: ${customerId}`, CustomerService.name);
+            throw new InternalServerErrorException("internal server error");
+        }
+
+        this.logger.log(`Refresh token stored for customer ID: ${customerId}`, CustomerService.name);
+    }
+
+    async updateRefreshToken(customerId: string, hashedRefreshToken: string) {
+        this.logger.debug(`Updating refresh token for customer ID: ${customerId}`, CustomerService.name);
+        const updatedToken = await this.prisma.customerRefreshToken.updateMany({
+            where: { customerId, isRevoked: false },
+            data: {
+                tokenHash: hashedRefreshToken,
+                expiresAt: addDays(new Date(), 7),   // 7 days
+            }
+        });
+
+        if (!updatedToken) {
+            this.logger.error(`Failed to update refresh token for customer ID: ${customerId}`, CustomerService.name);
+            throw new InternalServerErrorException("internal server error");
+        }
+
+        this.logger.log(`Refresh token updated for customer ID: ${customerId}`, CustomerService.name);
+    }
+
+    async findRefreshToken(tokenHash: string) {
+        return this.prisma.customerRefreshToken.findFirst({
+            where: {
+                tokenHash,
+                isRevoked: false,
+                expiresAt: {
+                    gt: new Date(),
+                }
+            },
+            include: {
+                customer: {
+                    select: { id: true, email: true }
+                }
+            }
+        });
+    }
+    
+    async findRefreshTokensByCustomerId(customerId: string) {
+        this.logger.debug(`Getting refresh tokens for customer ID: ${customerId}`, CustomerService.name);
+        return await this.prisma.customerRefreshToken.findMany({
+            where: {
+                customerId,
+                isRevoked: false,
+                expiresAt: { gt: new Date() }
+            },
+            include: {
+                customer: {
+                    select: { id: true, email: true }
+                }
+            }
+        });
+    }
+
+    async revokeRefreshToken(id: string) {
+        this.logger.debug(`Revoking refresh token ID: ${id}`, CustomerService.name);
+        const revokedToken = await this.prisma.customerRefreshToken.update({
+            where: { id },
+            data: {
+                isRevoked: true,
+            }
+        });
+
+        if (!revokedToken) {
+            this.logger.error(`Failed to revoke refresh token ID: ${id}`, CustomerService.name);
+            throw new InternalServerErrorException("internal server error");
+        }
+        this.logger.log(`Refresh token ID: ${id} revoked successfully`, CustomerService.name);
+    }
+
+    async revokeAllCustomerRefreshTokens(customerId: string) {
+        this.logger.debug(`Revoking all refresh tokens for customer ID: ${customerId}`, CustomerService.name);
+        await this.prisma.customerRefreshToken.updateMany({
+            where: { customerId, isRevoked: false },
+            data: { isRevoked: true }
+        });
+        this.logger.log(`All refresh tokens revoked for customer ID: ${customerId}`, CustomerService.name);
+    }
+
+    async cleanExpiredTokens() {
+        this.logger.debug(`Cleaning up expired refresh tokens`, CustomerService.name);
+        const result = await this.prisma.customerRefreshToken.deleteMany({
+            where: {
+                OR: [
+                    { expiresAt: { lt: new Date() } },
+                    { isRevoked: true, createdAt: { lt: addDays(new Date(), -30) } } // Delete revoked tokens older than 30 days
+                ]
+            }
+        });
+        this.logger.log(`Cleaned up ${result.count} expired refresh tokens`, CustomerService.name);
+    }
+
 }
