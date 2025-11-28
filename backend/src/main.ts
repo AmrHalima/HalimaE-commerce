@@ -58,6 +58,8 @@ async function bootstrap() {
     .addTag('products', 'Product management endpoints')
     .addTag('cart', 'Shopping cart endpoints')
     .addTag('customers', 'Customer management endpoints')
+    .addTag('customer-auth', 'Customer authentication endpoints')
+    .addTag('admin-auth', 'Admin/Employee authentication endpoints')
     .addTag('users', 'User management endpoints')
     .addBearerAuth(
       {
@@ -70,6 +72,16 @@ async function bootstrap() {
       },
       'JWT-auth',
     )
+      .addCookieAuth(
+          'refresh_token',
+          {
+              type: 'apiKey',
+              in: 'cookie',
+              name: 'refresh_token',
+              description: 'Refresh token stored as httpOnly cookie. Set automatically on login/signup.',
+          },
+          'refresh_token',
+      )
     .build();
   
   const document = SwaggerModule.createDocument(app, config);
