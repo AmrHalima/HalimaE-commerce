@@ -244,7 +244,7 @@ export class CustomerService {
         this.logger.log(`All refresh tokens revoked for customer ID: ${customerId}`, CustomerService.name);
     }
 
-    async cleanExpiredTokens() {
+    async cleanupExpiredTokens() {
         this.logger.debug(`Cleaning up expired refresh tokens`, CustomerService.name);
         const result = await this.prisma.customerRefreshToken.deleteMany({
             where: {
