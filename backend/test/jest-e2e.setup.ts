@@ -11,6 +11,8 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { Reflector } from '@nestjs/core';
 import { ResponseInterceptor } from '../common/interceptors/response.interceptor';
 import { GlobalExceptionFilter } from '../common/filters/global-exception.filter';
+import { ConfigService } from '@nestjs/config';
+import cookieParser from 'cookie-parser';
 
 // Global counter for unique test data
 let testCounter = 0;
@@ -43,7 +45,10 @@ async function cleanDatabase(prisma: PrismaService) {
     await prisma.collection.deleteMany().catch(() => {});
     await prisma.category.deleteMany().catch(() => {});
     await prisma.address.deleteMany().catch(() => {});
+    await prisma.passwordResetToken.deleteMany().catch(() => {});
+    await prisma.customerRefreshToken.deleteMany().catch(() => {});
     await prisma.customer.deleteMany().catch(() => {});
+    await prisma.refreshToken.deleteMany().catch(() => { });
     await prisma.user.deleteMany().catch(() => {});
     await prisma.role.deleteMany().catch(() => {});
 }
@@ -69,7 +74,11 @@ export async function setupE2ETest() {
     const logService = app.get(LogService);
     app.useLogger(logService);
     
+    const configService = app.get(ConfigService);
+    
     // Apply the same global configurations as in main.ts
+    app.use(cookieParser(configService.get<string>('COOKIE_SECRET')));
+    
     app.useGlobalFilters(new GlobalExceptionFilter(logService));
     
     const reflector = app.get(Reflector);

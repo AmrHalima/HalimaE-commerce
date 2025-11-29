@@ -145,6 +145,9 @@ model User {
   roleId String? @db.Uuid
   role   Role?   @relation(fields: [roleId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
+  refreshTokens RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+
   @@index([roleId])
   @@map("users")
 }
@@ -170,6 +173,57 @@ model User {
 //   @@map("role_permissions")
 // }
 
+model RefreshToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  tokenHash String
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  isRevoked Boolean  @default(false)
+
+  device    String?
+  ip        String?
+    @@index([userId])
+    @@map("refresh_tokens")
+    @@index([tokenHash])
+}
+
+model CustomerRefreshToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  tokenHash String
+  customerId    String   @db.Uuid
+  customer      Customer     @relation(fields: [customerId], references: [id])
+
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  isRevoked Boolean  @default(false)
+
+  device    String?
+  ip        String?
+  
+  @@index([customerId])
+  @@map("customer_refresh_tokens")
+  @@index([tokenHash])
+}
+
+model PasswordResetToken {
+  id          String   @id @default(uuid()) @db.Uuid
+  tokenHash   String   @unique
+  
+  userId      String?   @db.Uuid
+  user        User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customerId  String?   @db.Uuid
+  customer    Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
 model Customer {
   id           String    @id @default(uuid()) @db.Uuid
   email        String    @unique
@@ -182,9 +236,12 @@ model Customer {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  addresses Address[]
-  carts     Cart[]
-  orders    Order[]
+  refreshTokens CustomerRefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+
+  addresses     Address[]
+  carts         Cart[]
+  orders        Order[]
  
   @@index([status])
   @@index([createdAt])

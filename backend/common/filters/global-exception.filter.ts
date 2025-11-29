@@ -43,10 +43,11 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         } 
         // Handle Prisma errors
         else if (exception instanceof Prisma.PrismaClientKnownRequestError) {
-            httpStatus = this.getPrismaErrorStatus(exception.code);
+            const prismaError = exception as Prisma.PrismaClientKnownRequestError;
+            httpStatus = this.getPrismaErrorStatus(prismaError.code);
             errorResponse = {
-                message: this.getPrismaErrorMessage(exception),
-                code: exception.code,
+                message: this.getPrismaErrorMessage(prismaError),
+                code: prismaError.code,
             };
         }
         else if (exception instanceof Prisma.PrismaClientValidationError) {

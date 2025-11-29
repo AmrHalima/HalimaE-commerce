@@ -9,6 +9,7 @@ import { LogService } from './logger/log.service';
 import { ResponseInterceptor } from '../common/interceptors/response.interceptor';
 import { GlobalExceptionFilter } from '../common/filters/global-exception.filter';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import cookieParser from 'cookie-parser';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -46,6 +47,8 @@ async function bootstrap() {
   
   app.setGlobalPrefix('/api');
   
+  app.use(cookieParser(configService.get<string>('COOKIE_SECRET')));
+  
   // Swagger configuration
   const config = new DocumentBuilder()
     .setTitle('Halima E-commerce API')
@@ -55,6 +58,8 @@ async function bootstrap() {
     .addTag('products', 'Product management endpoints')
     .addTag('cart', 'Shopping cart endpoints')
     .addTag('customers', 'Customer management endpoints')
+    .addTag('customer-auth', 'Customer authentication endpoints')
+    .addTag('admin-auth', 'Admin/Employee authentication endpoints')
     .addTag('users', 'User management endpoints')
     .addBearerAuth(
       {
@@ -67,6 +72,16 @@ async function bootstrap() {
       },
       'JWT-auth',
     )
+      .addCookieAuth(
+          'refresh_token',
+          {
+              type: 'apiKey',
+              in: 'cookie',
+              name: 'refresh_token',
+              description: 'Refresh token stored as httpOnly cookie. Set automatically on login/signup.',
+          },
+          'refresh_token',
+      )
     .build();
   
   const document = SwaggerModule.createDocument(app, config);

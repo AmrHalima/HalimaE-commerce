@@ -1,6 +1,7 @@
 import {
     IsEmail,
     IsEnum,
+    IsNotEmpty,
     IsOptional,
     IsString,
     IsUUID,
@@ -17,6 +18,7 @@ export class CreateUserDto {
         maxLength: 255
     })
     @IsString()
+    @IsNotEmpty()
     @Length(3, 255)
     readonly name: string;
 
@@ -28,6 +30,7 @@ export class CreateUserDto {
     })
     @IsString()
     @IsEmail()
+    @IsNotEmpty()
     @Length(3, 255)
     readonly email: string;
 
@@ -38,6 +41,7 @@ export class CreateUserDto {
         maxLength: 16
     })
     @IsString()
+    @IsNotEmpty()
     @Length(8, 16)
     readonly password: string;
 

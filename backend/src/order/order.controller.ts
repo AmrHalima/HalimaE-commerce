@@ -32,13 +32,7 @@ import {
     ResponseOrderDto,
     ResponseOrdersFilteredDto
 } from './dto';
-
-interface RequestWithCustomer {
-    customer: {
-        id: string;
-        email: string;
-    };
-}
+import type { RequestWithCustomer } from '../../common/types/request-with-customer.type';
 
 @ApiTags('orders')
 @ApiExtraModels(
@@ -70,7 +64,7 @@ export class OrderController {
         @Request() req: RequestWithCustomer,
         @Body() createOrderDto: CreateOrderDto
     ) {
-        return this.orderService.createOrder(req.customer.id, createOrderDto);
+        return this.orderService.createOrder(req.customer.sub, createOrderDto);
     }
 
     @Get('my-orders')
@@ -86,7 +80,7 @@ export class OrderController {
         @Request() req: RequestWithCustomer,
         @Query() filterDto: FilterOrderDto
     ) {
-        return this.orderService.getCustomerOrders(req.customer.id, filterDto);
+        return this.orderService.getCustomerOrders(req.customer.sub, filterDto);
     }
 
     @Get('my-orders/:id')
@@ -104,7 +98,7 @@ export class OrderController {
         @Request() req: RequestWithCustomer,
         @Param('id') orderId: string
     ) {
-        return this.orderService.getOrderById(orderId, req.customer.id);
+        return this.orderService.getOrderById(orderId, req.customer.sub);
     }
 
     @Get('my-orders/number/:orderNo')
@@ -122,7 +116,7 @@ export class OrderController {
         @Request() req: RequestWithCustomer,
         @Param('orderNo') orderNo: string
     ) {
-        return this.orderService.getOrderByOrderNo(orderNo, req.customer.id);
+        return this.orderService.getOrderByOrderNo(orderNo, req.customer.sub);
     }
 
     @Patch('my-orders/:id/cancel')
@@ -141,7 +135,7 @@ export class OrderController {
         @Request() req: RequestWithCustomer,
         @Param('id') orderId: string
     ) {
-        return this.orderService.cancelOrder(orderId, req.customer.id);
+        return this.orderService.cancelOrder(orderId, req.customer.sub);
     }
 
     // Admin Routes

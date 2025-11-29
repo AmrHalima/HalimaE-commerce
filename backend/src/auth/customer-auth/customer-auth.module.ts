@@ -5,6 +5,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { CustomerAuthController } from './customer-auth.controller';
 import { CustomerModule } from '../../customer/customer.module';
 import { JwtCustomerStrategy } from './strategies/jwt.customer.strategy';
+import { EmailModule } from '../../email/email.module';
 
 @Module({
     imports: [
@@ -16,6 +17,7 @@ import { JwtCustomerStrategy } from './strategies/jwt.customer.strategy';
                 signOptions: { expiresIn: '1d' },
             }),
         }),
+        EmailModule,
         CustomerModule,
     ],
     providers: [CustomerAuthService, JwtCustomerStrategy],

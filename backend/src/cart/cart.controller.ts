@@ -24,13 +24,7 @@ import {
     AddToCartResponseDto
 } from './dto';
 import { JwtCustomerGuard } from '../auth/customer-auth/guards/jwt.customer.guard';
-
-interface RequestWithCustomer {
-    customer: {
-        id: string;
-        email: string;
-    };
-}
+import type { RequestWithCustomer } from '../../common/types/request-with-customer.type';
 
 @ApiTags('cart')
 @ApiExtraModels(AddToCartDto, UpdateCartItemDto, CartResponseDto, CheckoutCartDto, AddToCartResponseDto)
@@ -49,11 +43,11 @@ export class CartController {
     @ApiStandardErrorResponse(401, 'Unauthorized', 'Authentication required')
     @ApiStandardErrorResponse(404, 'Cart not found', 'No cart exists for this customer')
     async getCart(@Request() req: RequestWithCustomer): Promise<CartResponseDto> {
-        this.logger.debug(`Cart GET request from customer: ${req.customer.id} (${req.customer.email})`, 'CartController');
+        this.logger.debug(`Cart GET request from customer: ${req.customer.sub} (${req.customer.email})`, 'CartController');
         
-        const result = await this.cartService.getCart(req.customer.id);
+        const result = await this.cartService.getCart(req.customer.sub);
         
-        this.logger.debug(`Cart GET response for customer ${req.customer.id}: ${result ? 'cart data' : 'null'}`, 'CartController');
+        this.logger.debug(`Cart GET response for customer ${req.customer.sub}: ${result ? 'cart data' : 'null'}`, 'CartController');
         
         return result;
     }
@@ -64,7 +58,7 @@ export class CartController {
     @ApiStandardErrorResponse(401, 'Unauthorized', 'Authentication required')
     @ApiStandardErrorResponse(404, 'Cart not found', 'No cart exists for this customer')
     async getCartForCheckout(@Request() req: RequestWithCustomer): Promise<CheckoutCartDto | null> {
-        return this.cartService.getCartForCheckout(req.customer.id);
+        return this.cartService.getCartForCheckout(req.customer.sub);
     }
 
     @Get('count')
@@ -72,7 +66,7 @@ export class CartController {
     @ApiStandardResponse(Object, 'Cart count retrieved successfully')
     @ApiStandardErrorResponse(401, 'Unauthorized', 'Authentication required')
     async getCartItemsCount(@Request() req: RequestWithCustomer): Promise<{ count: number }> {
-        const count = await this.cartService.getCartItemsCount(req.customer.id);
+        const count = await this.cartService.getCartItemsCount(req.customer.sub);
         return { count };
     }
 
@@ -86,7 +80,7 @@ export class CartController {
         @Request() req: RequestWithCustomer,
         @Query('currency') currency: string = 'EGP'
     ) {
-        return this.cartService.calculateCartTotal(req.customer.id, currency);
+        return this.cartService.calculateCartTotal(req.customer.sub, currency);
     }
 
     @Post('items')
@@ -100,7 +94,7 @@ export class CartController {
         @Request() req: RequestWithCustomer,
         @Body() addToCartDto: AddToCartDto
     ) {
-        return this.cartService.addToCart(req.customer.id, addToCartDto);
+        return this.cartService.addToCart(req.customer.sub, addToCartDto);
     }
 
     @Patch('items/:itemId')
@@ -114,7 +108,7 @@ export class CartController {
         @Param('itemId') itemId: string,
         @Body() updateCartItemDto: UpdateCartItemDto
     ) {
-        return this.cartService.updateCartItem(req.customer.id, itemId, updateCartItemDto);
+        return this.cartService.updateCartItem(req.customer.sub, itemId, updateCartItemDto);
     }
 
     @Delete('items/:itemId')
@@ -127,7 +121,7 @@ export class CartController {
         @Request() req: RequestWithCustomer,
         @Param('itemId') itemId: string
     ) {
-        return this.cartService.removeFromCart(req.customer.id, itemId);
+        return this.cartService.removeFromCart(req.customer.sub, itemId);
     }
 
     @Delete()
@@ -137,6 +131,6 @@ export class CartController {
     @ApiStandardErrorResponse(404, 'Cart not found', 'No cart exists for this customer')
     @HttpCode(HttpStatus.NO_CONTENT)
     async clearCart(@Request() req: RequestWithCustomer) {
-        return this.cartService.clearCart(req.customer.id);
+        return this.cartService.clearCart(req.customer.sub);
     }
 }

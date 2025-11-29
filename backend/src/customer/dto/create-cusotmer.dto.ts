@@ -1,6 +1,7 @@
 import { 
     IsEmail,
     IsEnum,
+    IsNotEmpty,
     IsOptional,
     IsString,
     Length,
@@ -16,6 +17,7 @@ export class CreateCustomerDto {
         maxLength: 255
     })
     @IsString()
+    @IsNotEmpty()
     @Length(3, 255)
     readonly name: string;
 
@@ -26,6 +28,7 @@ export class CreateCustomerDto {
         maxLength: 255
     })
     @IsString()
+    @IsNotEmpty()
     @IsEmail()
     @Length(3, 255)
     readonly email: string;
@@ -37,6 +40,7 @@ export class CreateCustomerDto {
         maxLength: 16
     })
     @IsString()
+    @IsNotEmpty()
     @Length(8, 16)
     readonly password: string;
 
@@ -59,6 +63,7 @@ export class CreateCustomerDto {
         example: Status.ACTIVE
     })
     @IsEnum(Status)
+    @IsNotEmpty()
     readonly status: Status = Status.ACTIVE;
 
     @ApiProperty({
