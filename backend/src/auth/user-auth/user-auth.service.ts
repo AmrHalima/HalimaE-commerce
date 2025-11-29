@@ -5,7 +5,9 @@ import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
 import { LogService } from '../../logger/log.service';
 import { ConfigService } from '@nestjs/config';
-import { randomUUID } from 'crypto';
+import { randomUUID, randomBytes } from 'crypto';
+import { EmailService } from '../../email/email.service';
+import { ResetPasswordDto } from '../dto/reset-password.dto';
 
 @Injectable()
 export class UserAuthService {
@@ -14,6 +16,7 @@ export class UserAuthService {
         private readonly jwtService: JwtService,
         private readonly configService: ConfigService,
         private readonly logger: LogService,
+        private readonly emailService: EmailService,
     ) { }
 
     async signup(dto: CreateUserDto, device?: string, ip?: string): Promise<UserResponseDto & { refresh_token: string }> {
@@ -177,5 +180,58 @@ export class UserAuthService {
 
     async getActiveSessions(userId: string) {
         return await this.userService.getActiveSessions(userId);
+    }
+
+    async resetPassword(email: string): Promise<{ message: string }> {
+        this.logger.debug(`Initiating password reset for email: ${email}`, UserAuthService.name);
+        const user = await this.userService.findByEmail(email); 
+        if (!user) {
+            this.logger.warn(`Password reset requested for non-existent email: ${email}`, UserAuthService.name);
+        }
+
+        const resetToken = randomBytes(32).toString('hex');
+
+        if (user) {
+            // Invalidate any existing reset tokens for this user
+            await this.userService.invalidateAllUserResetTokens(user.id);
+            
+            await this.userService.storePasswordResetToken(user.id, resetToken);
+            
+            await this.emailService.sendResetPasswordEmail(
+                'Reset Your Password',
+                email,
+                resetToken
+            );
+        }
+
+        return {
+            message: 'If an account with that email exists, a password reset link has been sent.'
+        };
+    }
+
+    async resetPasswordConfirm(resetPasswordDto: ResetPasswordDto){
+        const resetToken = await this.userService.findPasswordResetToken(resetPasswordDto.token);
+        if (!resetToken) {
+            this.logger.warn(`Invalid or expired password reset token used`, UserAuthService.name);
+            throw new ForbiddenException('Invalid or expired password reset token');
+        }
+        if (resetToken.userId === null) {
+            this.logger.error(`Password reset token has no associated user`, UserAuthService.name);
+            throw new ForbiddenException('Invalid password reset token');
+        }
+        
+        // Update password
+        await this.userService.updatePassword(resetToken.userId, resetPasswordDto.newPassword);
+        
+        // Invalidate the used token
+        await this.userService.invalidatePasswordResetToken(resetToken.id);
+        
+        // Revoke all active sessions for security (force re-login on all devices)
+        await this.userService.revokeAllUserRefreshTokens(resetToken.userId);
+        
+        this.logger.log(`Password reset successfully for user ID: ${resetToken.userId}`, UserAuthService.name);
+        return {
+            message: 'Password has been reset successfully. Please log in with your new password.'
+        };
     }
 }

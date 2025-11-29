@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { CustomerService } from '../../customer/customer.service';
 import {
     CreateCustomerDto,
@@ -8,8 +8,10 @@ import * as argon2 from 'argon2';
 import { JwtService } from '@nestjs/jwt';
 import { Status } from '@prisma/client';
 import { LogService } from '../../logger/log.service';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { ConfigService } from '@nestjs/config';
+import { EmailService } from '../../email/email.service';
+import { ResetPasswordDto } from '../dto/reset-password.dto';
 
 
 @Injectable()
@@ -19,6 +21,7 @@ export class CustomerAuthService {
         private readonly jwtService: JwtService,
         private readonly logger: LogService,
         private readonly configService: ConfigService,
+        private readonly emailService: EmailService,
     ) { }
 
     async signup(dto: CreateCustomerDto, device?: string, ip?: string): Promise<ResponseAuthCustomerDto & { refresh_token: string }> {
@@ -193,5 +196,56 @@ export class CustomerAuthService {
     async logoutAll(refresh_token: any) {
         this.logger.log(`Revoking all refresh tokens for customer`, CustomerAuthService.name);
         await this.customerService.revokeAllCustomerRefreshTokens(refresh_token);
+    }
+
+    async resetPassword(email: string): Promise<{ message: string }> {
+        const customer = await this.customerService.findByEmail(email);
+        if (!customer) {
+            this.logger.warn(`Password reset requested for non-existent email: ${email}`, CustomerAuthService.name);
+        }
+
+        const resetToken = randomBytes(32).toString('hex');
+        if (customer) {
+            // Invalidate any existing reset tokens for this customer
+            await this.customerService.invalidateAllCustomerResetTokens(customer.id);
+            
+            await this.customerService.storePasswordResetToken(customer.id, resetToken);
+            await this.emailService.sendResetPasswordEmail(
+                'Reset Your Password',
+                email,
+                resetToken
+            );
+        }
+
+        return {
+            message: 'If an account with that email exists, a password reset link has been sent.'
+        }
+    }
+
+     async resetPasswordConfirm(resetPasswordDto: ResetPasswordDto){
+        const resetToken = await this.customerService.findPasswordResetToken(resetPasswordDto.token);
+        if (!resetToken) {
+            this.logger.warn(`Invalid or expired password reset token used`, CustomerAuthService.name);
+            throw new ForbiddenException('Invalid or expired password reset token');
+        }
+
+        if (resetToken.customerId === null) {
+            this.logger.error(`Password reset token has no associated customer`, CustomerAuthService.name);
+            throw new ForbiddenException('Invalid password reset token');
+        }
+        
+        // Update password
+        await this.customerService.updatePassword(resetToken.customerId, resetPasswordDto.newPassword);
+        
+        // Invalidate the used token
+        await this.customerService.invalidatePasswordResetToken(resetToken.id);
+        
+        // Revoke all active sessions for security (force re-login on all devices)
+        await this.customerService.revokeAllCustomerRefreshTokens(resetToken.customerId);
+        
+        this.logger.log(`Password reset successfully for customer ID: ${resetToken.customerId}`, CustomerAuthService.name);
+        return {
+            message: 'Password has been reset successfully. Please log in with your new password.'
+        };
     }
 }
