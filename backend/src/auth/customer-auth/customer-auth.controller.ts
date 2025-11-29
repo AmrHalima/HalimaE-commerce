@@ -183,7 +183,7 @@ export class CustomerAuthController {
     @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 requests per minute per IP
     @ApiOperation({
         summary: 'Confirm password reset',
-        description: 'Reset password using the token received via email. Token expires after 8 minutes. All active sessions will be invalidated after successful reset.'
+        description: 'Reset password using the token received via email. Token expires after 5 minutes. All active sessions will be invalidated after successful reset.'
     })
     @ApiStandardResponse(Object, 'Password reset successfully')
     @ApiStandardErrorResponse(403, 'Forbidden', 'Invalid or expired password reset token')
