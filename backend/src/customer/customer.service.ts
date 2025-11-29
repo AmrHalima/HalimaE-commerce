@@ -342,7 +342,10 @@ export class CustomerService {
     const allTokens = await this.prisma.passwordResetToken.findMany({
       where: {
         expiresAt: { gt: new Date() },
+        customerId: { not: null },
       },
+      take: 100,
+      orderBy: { createdAt: 'desc' },
     });
 
     for (const tokenRecord of allTokens) {

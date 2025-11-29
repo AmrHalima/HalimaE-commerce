@@ -1,6 +1,7 @@
 import {
   ConflictException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
@@ -252,7 +253,10 @@ export class UsersService {
     const allTokens = await this.prisma.passwordResetToken.findMany({
       where: {
         expiresAt: { gt: new Date() },
+        userId: { not: null },
       },
+      take: 100,
+      orderBy: { createdAt: 'desc' },
     });
 
     for (const tokenRecord of allTokens) {
