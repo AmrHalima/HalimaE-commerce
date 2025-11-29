@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { InternalServerErrorException, Module } from '@nestjs/common';
 import { EmailService } from './email.service';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { ConfigService } from '@nestjs/config';
@@ -6,17 +6,26 @@ import { ConfigService } from '@nestjs/config';
 @Module({
     imports: [
         MailerModule.forRootAsync({
-            useFactory: (configService: ConfigService) => ({
-                transport: {
-                    host: configService.get('SMTP_HOST'),
-                    port: configService.get('SMTP_PORT'),
-                    auth: {
-                        user: configService.get('SMTP_USER'),
-                        pass: configService.get('SMTP_PASS'),
+            useFactory: (configService: ConfigService) => {
+                const host = configService.get('SMTP_HOST');
+                const port = configService.get('SMTP_PORT');
+                const user = configService.get('SMTP_USER');
+                const pass = configService.get('SMTP_PASS');
+                const env  = configService.get('NODE_ENV');
+                
+                if (env === 'production' && (!host || !port || !user || !pass)) {
+                    throw new InternalServerErrorException('Missing required SMTP configuration');
+                }
+                
+                return {
+                    transport: {
+                        host  : host         || 'localhost',
+                        port  : Number(port) || 1025,
+                        auth  : (user && pass)? { user, pass }: undefined,
+                        secure: env === 'production',
                     },
-                    secure: configService.get('NODE_ENV') === 'production',
-                },
-            }),
+                };
+            },
             inject: [ConfigService],
         }),
     ],
