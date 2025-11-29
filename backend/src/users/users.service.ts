@@ -186,4 +186,69 @@ export class UsersService {
             }
         });
     }
+
+    async storePasswordResetToken(userId: string, token: string): Promise<void> {
+        if (!userId || !token) {
+            this.logger.error(`Invalid parameters for storing password reset token`, UsersService.name);
+            throw new InternalServerErrorException("internal server error");
+        }
+
+        const result = await this.prisma.passwordResetToken.create({
+            data: {
+                userId,
+                tokenHash: await argon2.hash(token),
+                expiresAt: new Date(Date.now() + 300000) // 5 minutes
+            }
+        });
+
+        if (!result) {
+            this.logger.error(`Failed to store password reset token for user ID: ${userId}`, UsersService.name);
+            throw new InternalServerErrorException("internal server error");
+        }
+    }
+
+    async invalidateAllUserResetTokens(userId: string): Promise<void> {
+        this.logger.debug(`Invalidating all reset tokens for user ID: ${userId}`, UsersService.name);
+        await this.prisma.passwordResetToken.deleteMany({
+            where: { userId }
+        });
+    }
+
+    async cleanupExpiredResetTokens(): Promise<number> {
+        const result = await this.prisma.passwordResetToken.deleteMany({
+            where: {
+                expiresAt: { lt: new Date() }
+            }
+        });
+        return result.count;
+    }
+
+    async findPasswordResetToken(token: string) {
+        const allTokens = await this.prisma.passwordResetToken.findMany({
+            where: {
+                expiresAt: { gt: new Date() }
+            }
+        });
+
+        for (const tokenRecord of allTokens) {
+            if (await argon2.verify(tokenRecord.tokenHash, token)) {
+                return tokenRecord;
+            }
+        }
+
+        return null;
+    }
+
+    async invalidatePasswordResetToken(tokenId: string): Promise<void> {
+        await this.prisma.passwordResetToken.delete({
+            where: { id: tokenId }
+        });
+    }
+
+    async updatePassword(userId: string, newPassword: string): Promise<void> {
+        await this.prisma.user.update({
+            where: { id: userId },
+            data: { passwordHash: await argon2.hash(newPassword) }
+        });
+    }
 }

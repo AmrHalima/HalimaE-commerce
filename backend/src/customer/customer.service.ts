@@ -257,4 +257,56 @@ export class CustomerService {
         this.logger.log(`Cleaned up ${result.count} expired refresh tokens`, CustomerService.name);
     }
 
+    async storePasswordResetToken(customerId: string, token: string) {
+        this.logger.debug(`Storing password reset token for customer ID: ${customerId}`, CustomerService.name);
+        
+        const result = await this.prisma.passwordResetToken.create({
+            data: {
+                customerId,
+                tokenHash: await argon2.hash(token),
+                expiresAt: new Date(Date.now() + 300000) // 5 minutes
+            }
+        });
+
+        if (!result) {
+            this.logger.error(`Failed to store password reset token for customer ID: ${customerId}`, CustomerService.name);
+            throw new InternalServerErrorException("internal server error");
+        }
+    }
+
+    async invalidateAllCustomerResetTokens(customerId: string): Promise<void> {
+        this.logger.debug(`Invalidating all reset tokens for customer ID: ${customerId}`, CustomerService.name);
+        await this.prisma.passwordResetToken.deleteMany({
+            where: { customerId }
+        });
+    }
+
+    async findPasswordResetToken(token: string) {
+        const allTokens = await this.prisma.passwordResetToken.findMany({
+            where: {
+                expiresAt: { gt: new Date() }
+            }
+        });
+
+        for (const tokenRecord of allTokens) {
+            if (await argon2.verify(tokenRecord.tokenHash, token)) {
+                return tokenRecord;
+            }
+        }
+
+        return null;
+    }
+
+    async invalidatePasswordResetToken(tokenId: string): Promise<void> {
+        await this.prisma.passwordResetToken.delete({
+            where: { id: tokenId }
+        });
+    }
+
+    async updatePassword(customerId: string, newPassword: string): Promise<void> {
+        await this.prisma.customer.update({
+            where: { id: customerId },
+            data: { passwordHash: await argon2.hash(newPassword) }
+        });
+    }
 }
