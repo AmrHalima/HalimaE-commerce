@@ -5,6 +5,7 @@ import { CreateUserDto, LoginUserDto } from '../../users/dto';
 import { UsersService } from '../../users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../prisma/prisma.service';
+import { ConfigService } from '@nestjs/config';
 
 describe('UserAuthController', () => {
   let controller: UserAuthController;
@@ -15,14 +16,33 @@ describe('UserAuthController', () => {
     login: jest.fn(),
   };
 
+  const mockConfigService = {
+    get: jest.fn().mockReturnValue('test'),
+  };
+
+  const mockRequest = {
+    headers: { 'user-agent': 'test-agent' },
+    ip: '127.0.0.1',
+    cookies: {},
+  } as any;
+
+  const mockResponse = {
+    cookie: jest.fn(),
+    clearCookie: jest.fn(),
+  } as any;
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-        imports: [CreateUserDto],
+        imports: [],
         controllers: [UserAuthController],
         providers: [
             {
                 provide: UserAuthService,
                 useValue: mockUserAuthService,
+            },
+            {
+                provide: ConfigService,
+                useValue: mockConfigService,
             },
             {
                 provide: UsersService,
@@ -71,15 +91,24 @@ describe('UserAuthController', () => {
             roleId: 'b94da66f-bb5b-4e25-9c6e-4e84af84df4f'
         };
         const expectedResult = {
-            user: { id: '1', email: 'test@example.com', name: 'test' ,role: 'admin' },
+            name: 'test',
+            email: 'test@example.com',
+            role: { name: 'admin' },
             access_token: 'some-token',
+            refresh_token: 'refresh-token',
         };
         mockUserAuthService.signup.mockResolvedValue(expectedResult);
 
-        const result = await controller.signup(createUserDto);
+        const result = await controller.signup(createUserDto, mockRequest, mockResponse);
 
-        expect(service.signup).toHaveBeenCalledWith(createUserDto);
-        expect(result).toEqual(expectedResult);
+        expect(service.signup).toHaveBeenCalledWith(createUserDto, 'test-agent', '127.0.0.1');
+        expect(mockResponse.cookie).toHaveBeenCalled();
+        expect(result).toEqual({
+            name: 'test',
+            email: 'test@example.com',
+            role: { name: 'admin' },
+            access_token: 'some-token',
+        });
     });
   });
 
@@ -90,15 +119,24 @@ describe('UserAuthController', () => {
             password: 'password',
         };
         const expectedResult = {
-            user: { id: '1', email: 'test@example.com', name: 'test', role: 'admin' },
+            name: 'test',
+            email: 'test@example.com',
+            role: { name: 'admin' },
             access_token: 'some-token',
+            refresh_token: 'refresh-token',
         };
         mockUserAuthService.login.mockResolvedValue(expectedResult);
 
-        const result = await controller.login(loginUserDto);
+        const result = await controller.login(loginUserDto, mockRequest, mockResponse);
 
-        expect(service.login).toHaveBeenCalledWith(loginUserDto);
-        expect(result).toEqual(expectedResult);
+        expect(service.login).toHaveBeenCalledWith(loginUserDto, 'test-agent', '127.0.0.1');
+        expect(mockResponse.cookie).toHaveBeenCalled();
+        expect(result).toEqual({
+            name: 'test',
+            email: 'test@example.com',
+            role: { name: 'admin' },
+            access_token: 'some-token',
+        });
     });
   });
 });
