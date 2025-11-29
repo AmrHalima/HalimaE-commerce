@@ -146,6 +146,7 @@ model User {
   role   Role?   @relation(fields: [roleId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   refreshTokens RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
 
   @@index([roleId])
   @@map("users")
@@ -207,6 +208,21 @@ model CustomerRefreshToken {
   @@index([tokenHash])
 }
 
+model PasswordResetToken {
+  id          String   @id @default(uuid()) @db.Uuid
+  tokenHash   String   @unique
+  
+  userId      String?   @db.Uuid
+  user        User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customerId  String?   @db.Uuid
+  customer    Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
 
 model Customer {
   id           String    @id @default(uuid()) @db.Uuid
@@ -221,6 +237,8 @@ model Customer {
   updatedAt    DateTime  @updatedAt
 
   refreshTokens CustomerRefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+
   addresses     Address[]
   carts         Cart[]
   orders        Order[]
