@@ -15,7 +15,7 @@ export class EmailService {
         resetToken: string,
     ): Promise<void> {
         const resetLink =
-            `${this.configService.get('FRONTEND_URL')}/reset-password?token=${resetToken}`;
+            `${this.configService.get('FRONTEND_URL')}/reset-password/${resetToken}`;
 
         // TODO: Implement template for better email formatting
         await this.mailerService.sendMail({
