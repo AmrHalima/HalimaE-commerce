@@ -12,6 +12,7 @@ import { LogModule } from './logger/log.module';
 import { CartModule } from './cart/cart.module';
 import { OrderModule } from './order/order.module';
 import { PaymentModule } from './payment/payment.module';
+import { EmailModule } from './email/email.module';
 
 @Module({
     imports: [
@@ -35,6 +36,7 @@ import { PaymentModule } from './payment/payment.module';
         CartModule,
         OrderModule,
         PaymentModule,
+        EmailModule,
     ],
     providers: [
         {
