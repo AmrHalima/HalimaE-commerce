@@ -18,11 +18,13 @@ import type { Request, Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import type { RequestWithCustomer } from '../../../common/types/request-with-customer.type';
 import { JwtCustomerGuard } from './guards/jwt.customer.guard';
+import { ResetPasswordDto, ResetPasswordRequestDto } from '../dto';
+import { Throttle } from '@nestjs/throttler';
 
 
 
 @ApiTags('customer-auth')
-@ApiExtraModels(CreateCustomerDto, AuthCustomerDto, ResponseAuthCustomerDto)
+@ApiExtraModels(CreateCustomerDto, AuthCustomerDto, ResponseAuthCustomerDto, ResetPasswordDto, ResetPasswordRequestDto)
 @Controller('customers/auth')
 export class CustomerAuthController {
     constructor(
@@ -106,7 +108,7 @@ export class CustomerAuthController {
             httpOnly: true,
             secure: this.configService.get('NODE_ENV') === 'production',
             sameSite: 'strict',
-            maxAge: 7 * 24 * 60 * 60 * 1000,                               // 7 days
+            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
             path: '/api/customers/auth'
         });
 
@@ -161,5 +163,34 @@ export class CustomerAuthController {
         });
 
         return { message: 'Logged out from all devices successfully' };
+    }
+
+    @Post('reset-password-request')
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ default: { limit: 3, ttl: 60000 } }) // 3 requests per minute per IP
+    @ApiOperation({
+        summary: 'Request password reset',
+        description: 'Send a password reset link to the provided email address. Rate limited to 3 requests per minute. Returns same message whether email exists or not to prevent user enumeration.'
+    })
+    @ApiStandardResponse(Object, 'Password reset email sent if account exists')
+    @ApiStandardErrorResponse(429, 'Too Many Requests', 'Rate limit exceeded. Please try again later.')
+    async resetPassword(@Body() dto: ResetPasswordRequestDto): Promise<{ message: string }> {
+        return this.customerAuthService.resetPassword(dto.email);
+    }
+
+    @Post('reset-password')
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 requests per minute per IP
+    @ApiOperation({
+        summary: 'Confirm password reset',
+        description: 'Reset password using the token received via email. Token expires after 8 minutes. All active sessions will be invalidated after successful reset.'
+    })
+    @ApiStandardResponse(Object, 'Password reset successfully')
+    @ApiStandardErrorResponse(403, 'Forbidden', 'Invalid or expired password reset token')
+    @ApiStandardErrorResponse(429, 'Too Many Requests', 'Rate limit exceeded. Please try again later.')
+    async resetPasswordConfirm(
+        @Body() resetPasswordDto: ResetPasswordDto
+    ): Promise<{ message: string }> {
+        return this.customerAuthService.resetPasswordConfirm(resetPasswordDto);
     }
 }
