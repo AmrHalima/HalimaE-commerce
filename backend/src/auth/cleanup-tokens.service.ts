@@ -19,4 +19,12 @@ export class CleanupTokensService {
         await this.customerService.cleanupExpiredTokens();
         this.logger.log('Finished cleanup of expired tokens', CleanupTokensService.name);
     }
+
+    @Cron('0 1 * * *', { name: 'cleanupResetTokens' }) // Runs every day at 1 AM
+    async cleanupResetTokens() {
+        this.logger.log('Starting cleanup of expired password reset tokens', CleanupTokensService.name);
+        // it already removes all expired tokens no need to call customer service version
+        await this.userService.cleanupExpiredResetTokens();
+        this.logger.log('Finished cleanup of expired password reset tokens', CleanupTokensService.name);
+    }
 }
